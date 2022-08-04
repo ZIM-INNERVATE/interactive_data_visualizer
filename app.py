@@ -3,7 +3,7 @@ import dash_bootstrap_components as dbc
 import flask
 from flask_caching import Cache
 
-from layout.main_layout import layout
+from layouts.main_layout import layout
 
 server = flask.Flask(__name__)
 
