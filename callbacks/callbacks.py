@@ -13,7 +13,9 @@ from dash import html
 from dash.dependencies import Input, Output, State
 from plotly.subplots import make_subplots
 
-UPLOAD_DIRECTORY = os.environ.get("DATADIR")
+UPLOAD_DIRECTORY = "/tmp"
+if os.environ.get("DATADIR") is not None:
+    UPLOAD_DIRECTORY = os.environ.get("DATADIR")
 
 @app.callback(
     Output("file-list", "children"),
