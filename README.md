@@ -10,7 +10,7 @@ The tool expects a csv file containing the following attributes:
 * `theta` : the orientation of the robot
 * `group` : group id
 * `motion` : left (l), straight (s), and right (r) representing the motions for lego robot experiments and representing the place location for the KUKA youBot arm experiments
-* `wights` (optional) : small (s), medium (m), large (l) representing the size of the objects to be placed
+* `weight` (optional) : small (s), medium (m), large (l) representing the size of the objects to be placed
 
 The visualization includes:
 * Tabular data
@@ -18,6 +18,8 @@ The visualization includes:
 * Histogram and probability distribution
 * Normality test using Lilliefors, Shapiro-Wilk, and chi square
 * Quantile quantile (QQ) plots
+
+![Demo Interactive Data Visualizer](figures/idv.gif)
 
 ## Installation and Usage
 * Local install
@@ -39,4 +41,6 @@ The visualization includes:
   docker run -d -p 8085:8085 digiklausur/idv:latest
   ```
 
-## Using This Tool with Jupyter
+## Deployment on Kubernetes
+
+## Usage with Jupyter
