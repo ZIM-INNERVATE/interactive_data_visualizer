@@ -4,14 +4,13 @@ from dash import dash_table, dcc, html
 visualization_layout = html.Div(
         className='nine columns div-for-charts bg-white',
         children=[
-            #html.Div(id='intermediate-output', style={'display': 'none'}),
             dcc.Tabs(
               id="tabs-for-plots",
-              value="xy-scatter",
+              value="tab-data",
               parent_className='custom-tabs',
               className='custom-tabs-container',
               children=[
-                  dcc.Tab(label='Data', 
+                  dcc.Tab(label='Data', value='tab-data',
                       children=[
                           html.Div([
                               html.Label("Experimentation Data", 
@@ -46,20 +45,19 @@ visualization_layout = html.Div(
                       className='custom-tab',
                       selected_className='custom-tab--selected',
                   ),
-                  dcc.Tab(label='Scatter Plot', 
+                  dcc.Tab(label='Scatter Plot', value='tab-scatter',
                       children=[
                           dcc.Graph(id='xy-scatter',
                                     #figure=dict(layout=dict(autosize=False)),
                                     config={'displayModeBar': True},
                                     # config={'displayModeBar': True, 'responsive': True},
                                     animate=True,
-                                    #style={'height': '100%',},
                                     ),
                       ],
                       className='custom-tab',
                       selected_className='custom-tab--selected',
                   ),
-                  dcc.Tab(label='Distribution and Histogram', 
+                  dcc.Tab(label='Distribution and Histogram', value='tab-histogram',
                       children=[
                           dcc.Graph(id='pca-all-fig',
                                     config={'displayModeBar': True},
@@ -71,7 +69,7 @@ visualization_layout = html.Div(
                       className='custom-tab',
                       selected_className='custom-tab--selected',
                   ),
-                  dcc.Tab(label='Normality Test', 
+                  dcc.Tab(label='Normality Test', value='tab-normality-test',
                       children=[
                           html.Div([
                               html.Label("Normality test results with lilliefors", 
