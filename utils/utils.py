@@ -35,12 +35,24 @@ def get_uploaded_files(upload_directory):
             files.append(filename)
     return files
 
-def get_dataframe(filename, upload_directory, delimeter=","):
+def load_dataframe(filepath, sep=","):
     """
     Read csv file
     """
-    return pd.read_csv(os.path.join(upload_directory, filename),
-                       delimiter=delimeter).reset_index()
+    df = pd.read_csv(filepath,
+                     sep=sep,
+                     dtype="str").reset_index()
+    # convert x, y, and theta to float if separator is ;, the decimal point os ,
+    df['x'] = df['x'].apply(lambda x: float(x.split()[0].replace(',', '.')))
+    df['x'] = df['x'].astype(float)
+
+    df['y'] = df['y'].apply(lambda x: float(x.split()[0].replace(',', '.')))
+    df['y'] = df['y'].astype(float)
+
+    df['theta'] = df['theta'].apply(lambda x: float(x.split()[0].replace(',', '.')))
+    df['theta'] = df['theta'].astype(float)
+
+    return df
 
 def delete_file(filename, upload_directory):
     """
