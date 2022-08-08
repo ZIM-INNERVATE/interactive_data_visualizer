@@ -3,7 +3,6 @@ import os
 from app import app, server
 from callbacks import callbacks
 
-
 if __name__ == '__main__':
     if not os.environ.get("HOST"):
         os.environ["HOST"] = "0.0.0.0"
