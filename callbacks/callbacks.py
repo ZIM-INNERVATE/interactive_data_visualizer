@@ -9,7 +9,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 import utils.utils as utils
 from app import app
-from dash import html
 from dash.dependencies import Input, Output, State
 from plotly.subplots import make_subplots
 
@@ -31,9 +30,9 @@ def file_list(uploaded_filenames,
 
     files = utils.get_uploaded_files(UPLOAD_DIRECTORY)
     if len(files) == 0:
-        return [html.Li("No files uploaded")], []
+        return [dash.html.Li("No files uploaded")], []
     else:
-        return [html.Li(fname) for fname in files],\
+        return [dash.html.Li(fname) for fname in files],\
                [{'label': fname, 'value': fname} for fname in  files]
 
 @app.callback(Output('output-selected-file', 'children'),
@@ -55,25 +54,34 @@ def process_selected_file(selected_file, n_clicks_select, n_clicks_delete):
 
 @app.callback([Output('dropdown-groups', 'options'),
                Output('dropdown-groups', 'value'),
-               Output('checklist-motions', 'options'),],
+               Output('checklist-motions', 'options'),
+               Output('checklist-weights', 'options'),],
               [Input('output-selected-file', 'children'),],
              )
 def generate_options(filename):
     if filename:
         df = utils.get_dataframe(filename, UPLOAD_DIRECTORY)
         checklist_motions = [{"label": col, "value": col} for col in df.motion.unique()]
-        
+
+        if "weight" in df:
+            checklist_weights = [{"label": col, "value": col} for col in df.weight.unique()]
+        else:
+            checklist_weights = [{"label": "small (NA)", "value": "small"},
+                                 {"label": "medium (NA)", "value": "medium"},
+                                 {"label": "large (NA)", "value": "large"}]
+
         return df.group.unique(),\
                df.group.unique(),\
-               checklist_motions
+               checklist_motions,\
+               checklist_weights
     else:
         raise dash.exceptions.PreventUpdate
         
 @app.callback([Output('checklist-motions', 'value'),
-               Output('checklist-motions-all', 'value'),],
+               Output('checklist-motions-all', 'value')],
               [Input('checklist-motions-all', 'value'),
                Input('checklist-motions', 'value'),
-               State('checklist-motions', 'options'),],
+               State('checklist-motions', 'options')],
               prevent_initial_call=True,
              )
 def update_motion_checklist(checklist_motions_all_val,
@@ -94,24 +102,53 @@ def update_motion_checklist(checklist_motions_all_val,
         else:
             return checklist_motions_val, []
 
+@app.callback([Output('checklist-weights', 'value'),
+               Output('checklist-weights-all', 'value')],
+              [Input('checklist-weights-all', 'value'),
+               Input('checklist-weights', 'value'),
+               State('checklist-weights', 'options')],
+              prevent_initial_call=True,
+             )
+def update_weight_checklist(checklist_weights_all_val,
+                            checklist_weights_val, 
+                            checklist_weights_opt):
+    ctx = dash.callback_context
+    input_id = ctx.triggered[0]["prop_id"].split(".")[0]
+    if input_id == "checklist-weights-all":
+        if checklist_weights_all_val:
+            checklist_weights_val = [val['value'] for val in checklist_weights_opt]
+        else:
+            checklist_weights_val = []
+        return checklist_weights_val, checklist_weights_all_val
+
+    elif input_id == "checklist-weights":
+        if len(checklist_weights_opt) == len(checklist_weights_val):
+            return checklist_weights_val, ["All"]
+        else:
+            return checklist_weights_val, []
+
 @app.callback([Output('xy-scatter', 'figure'),
                Output('pca-all-fig', 'figure'),
                Output('pca-group-fig', 'figure'),
-               Output('normality-test-fig', 'figure'),
-              ],
+               Output('normality-test-fig', 'figure')],
               [Input('output-selected-file', 'children'),
                Input('dropdown-groups', 'value'),
-               Input('checklist-motions', 'value'),],
+               Input('checklist-motions', 'value'),
+               Input('checklist-weights', 'value')],
               prevent_initial_call=False,
              )
-def update_graphs(selected_file, selected_groups, selected_motions):
+def update_graphs(selected_file, selected_groups, selected_motions, selected_weights):
     if selected_file:
         df = utils.get_dataframe(selected_file, UPLOAD_DIRECTORY)
         df = df[df["group"].isin(selected_groups)]
         df = df[df["motion"].isin(selected_motions)]
-        num_selected_groups = len(df.group.unique())
-        num_selected_motions = len(df.motion.unique())
-        num_group_subplots = num_selected_groups * num_selected_motions
+        num_selected_weights = 1
+        if 'weight' in df:
+            df = df[df["weight"].isin(selected_weights)]
+            num_selected_weights = len(df.weight.unique())
+        num_group_subplots = len(df.group.unique()) * \
+                             len(df.motion.unique()) * \
+                             num_selected_weights
 
         if not df.empty:
             extracted_df = utils.exctract_data(df)
@@ -210,15 +247,18 @@ def update_graphs(selected_file, selected_groups, selected_motions):
                Output('normality-test-table-chi2', 'columns'),],
               [Input('output-selected-file', 'children'),
                Input('dropdown-groups', 'value'),
-               Input('checklist-motions', 'value'),],
+               Input('checklist-motions', 'value'),
+               Input('checklist-weights', 'value')],
               prevent_initial_call=False,
              )
-def update_normality_table(selected_file, selected_groups, selected_motions):
+def update_normality_table(selected_file, selected_groups, selected_motions, selected_weights):
     significance = 0.05
     if selected_file:
         df = utils.get_dataframe(selected_file, UPLOAD_DIRECTORY)
         df = df[df["group"].isin(selected_groups)]
         df = df[df["motion"].isin(selected_motions)]
+        if 'weight' in df:
+            df = df[df["weight"].isin(selected_weights)]
 
         if not df.empty:
             extracted_df = utils.exctract_data(df)
@@ -273,14 +313,17 @@ def update_normality_table(selected_file, selected_groups, selected_motions):
                Output('experimentation-data', 'columns'),],
               [Input('output-selected-file', 'children'),
                Input('dropdown-groups', 'value'),
-               Input('checklist-motions', 'value'),],
+               Input('checklist-motions', 'value'),
+               Input('checklist-weights', 'value')],
               prevent_initial_call=False,
              )
-def update_data_table(selected_file, selected_groups, selected_motions):
+def update_data_table(selected_file, selected_groups, selected_motions, selected_weights):
     if selected_file:
         df = utils.get_dataframe(selected_file, UPLOAD_DIRECTORY)
         df = df[df["group"].isin(selected_groups)]
         df = df[df["motion"].isin(selected_motions)]
+        if 'weight' in df:
+            df = df[df["weight"].isin(selected_weights)]
         df.reset_index(drop=True, inplace=True)
 
         if not df.empty:
