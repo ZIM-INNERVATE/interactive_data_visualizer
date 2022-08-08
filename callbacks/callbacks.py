@@ -29,8 +29,9 @@ def file_list(uploaded_filenames,
     if len(files) == 0:
         return [dash.html.Li("No files uploaded")], []
     else:
-        return [dash.html.Li(fname) for fname in files],\
-               [{'label': fname, 'value': fname} for fname in  files]
+        csv_files = [fname for fname in files if os.path.splitext(fname)[1] == ".csv"]
+        return [dash.html.Li(fname) for fname in csv_files],\
+               [{'label': fname, 'value': fname} for fname in  csv_files]
 
 @app.callback(Output('output-selected-file', 'children'),
               [Input('dropdown-select-file', 'value'),
@@ -264,11 +265,7 @@ def update_normality_table(experimentation_data):
         raise dash.exceptions.PreventUpdate
 
 @app.callback([Output('experimentation-data', 'data'),
-               Output('experimentation-data', 'columns'),
-               Output('dropdown-groups', 'options'),
-               Output('dropdown-groups', 'value'),
-               Output('checklist-motions', 'options'),
-               Output('checklist-weights', 'options'),],
+               Output('experimentation-data', 'columns'),],
               [Input('output-selected-file', 'children'),
                Input('dropdown-csv-separator', 'value'),
                Input('dropdown-groups', 'value'),
@@ -285,16 +282,6 @@ def update_data_table(selected_file,
         df = utils.load_dataframe(os.path.join(UPLOAD_DIRECTORY, selected_file),
                                  csv_separator)
         if not df.empty:
-            # generate motion, weight, and group checklist
-            checklist_motions = [{"label": col, "value": col} for col in df.motion.unique()]
-            if "weight" in df:
-                checklist_weights = [{"label": col, "value": col} for col in df.weight.unique()]
-            else:
-                checklist_weights = [{"label": "small (NA)", "value": "small"},
-                                    {"label": "medium (NA)", "value": "medium"},
-                                    {"label": "large (NA)", "value": "large"}]
-            group_ids = df.group.unique()
-
             df = df[df["group"].isin(selected_groups)]
             df = df[df["motion"].isin(selected_motions)]
             if 'weight' in df:
@@ -303,13 +290,32 @@ def update_data_table(selected_file,
 
             header = [{"name": i, "id": i} for i in df.columns]
             data = df.to_dict('records')
-            return data, \
-                   header, \
-                   group_ids,\
-                   group_ids,\
-                   checklist_motions,\
-                   checklist_weights
+            return data, header
         else:
             raise dash.exceptions.PreventUpdate
+    else:
+        raise dash.exceptions.PreventUpdate
+
+@app.callback([Output('dropdown-groups', 'options'),
+               Output('dropdown-groups', 'value'),
+               Output('checklist-motions', 'options'),
+               Output('checklist-weights', 'options'),],
+              [Input('output-selected-file', 'children'),],
+             )
+def initialize_options(selected_file):
+    if selected_file:
+        df = utils.load_dataframe(os.path.join(UPLOAD_DIRECTORY, selected_file))
+        checklist_motions = [{"label": col, "value": col} for col in df.motion.unique()]
+
+        if "weight" in df:
+            checklist_weights = [{"label": col, "value": col} for col in df.weight.unique()]
+        else:
+            checklist_weights = [{"label": "small (NA)", "value": "small"},
+                                 {"label": "medium (NA)", "value": "medium"},
+                                 {"label": "large (NA)", "value": "large"}]
+        return df.group.unique(),\
+               df.group.unique(),\
+               checklist_motions,\
+               checklist_weights
     else:
         raise dash.exceptions.PreventUpdate
