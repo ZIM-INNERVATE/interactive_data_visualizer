@@ -29,13 +29,31 @@ option_layout = html.Div(
                 ),
                 dbc.Row([
                     html.Div([
+                        dcc.Dropdown(id='dropdown-csv-separator',
+                                    style = {'width': '100%',
+                                             'color': '#212121',
+                                            },
+                                    options = [{"label": ";", "value": ";"},
+                                               {"label": ",", "value": ","}],
+                                    value = ",",
+                                    placeholder="CSV separator (default: ,)",
+                                    searchable=False,
+                                    clearable=False,
+                                    multi=False),
+                        ],
+                        className="mb-3 gap-2 d-md-flex justify-content-md-center",
+                    ),
+                  ],
+                  style={'padding': '10px 0px 10px 0px'}
+                ),
+                dbc.Row([
+                    html.Div([
                         dcc.Dropdown(id='dropdown-select-file',   
                                     style = {'width': '100%',
-                                              'color': '#212121',
-                                            },   
-                                    #className='stockselector',
+                                             'color': '#212121',
+                                            },
                                     options = [],
-                                    value = [],
+                                    value = "",
                                     placeholder="Select file",
                                     searchable=True,
                                     clearable=True,
@@ -45,7 +63,6 @@ option_layout = html.Div(
                         ],
                         className="mb-3 gap-2 d-md-flex justify-content-md-center",
                     ),
-                    
                   ],
                   style={'padding': '10px 0px 10px 0px'}
                 ),
@@ -75,7 +92,7 @@ option_layout = html.Div(
                                               searchable=True,
                                               clearable=True,
                                               multi=True
-                                  ),
+                                ),
                               ])
                             ]),
                             dbc.Row([
