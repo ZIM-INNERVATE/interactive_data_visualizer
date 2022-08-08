@@ -1,5 +1,4 @@
 import os
-from re import sub
 
 import dash
 import matplotlib.pyplot as plt
@@ -16,15 +15,13 @@ UPLOAD_DIRECTORY = "/tmp"
 if os.environ.get("DATADIR") is not None:
     UPLOAD_DIRECTORY = os.environ.get("DATADIR")
 
-@app.callback(
-    Output("file-list", "children"),
-    Output("dropdown-select-file", "options"),
-    [Input("upload-data", "filename"), 
-     Input("upload-data", "contents"),],
-)
+@app.callback([Output("file-list", "children"),
+               Output("dropdown-select-file", "options"),],
+              [Input("upload-data", "filename"),
+               Input("upload-data", "contents"),],
+             )
 def file_list(uploaded_filenames, 
               uploaded_file_contents):
-
     if uploaded_filenames is not None and uploaded_file_contents is not None:
         utils.save_file(uploaded_filenames, uploaded_file_contents, UPLOAD_DIRECTORY)
 
@@ -36,13 +33,12 @@ def file_list(uploaded_filenames,
                [{'label': fname, 'value': fname} for fname in  files]
 
 @app.callback(Output('output-selected-file', 'children'),
-          [Input('dropdown-select-file', 'value'),
-           Input('delete-button', 'n_clicks'),
-           Input('select-button', 'n_clicks')],
-           )
+              [Input('dropdown-select-file', 'value'),
+               Input('select-button', 'n_clicks'),
+               Input('delete-button', 'n_clicks')],
+             )
 def process_selected_file(selected_file, n_clicks_select, n_clicks_delete):
     ctx = dash.callback_context
-
     if ctx.triggered:
         button_id = ctx.triggered[0]['prop_id'].split('.')[0]
         if button_id == 'delete-button' and selected_file is not None:
@@ -70,7 +66,6 @@ def update_motion_checklist(checklist_motions_all_val,
         else:
             checklist_motions_val = []
         return checklist_motions_val, checklist_motions_all_val
-
     elif input_id == "checklist-motions":
         if len(checklist_motions_opt) == len(checklist_motions_val):
             return checklist_motions_val, ["All"]
@@ -95,7 +90,6 @@ def update_weight_checklist(checklist_weights_all_val,
         else:
             checklist_weights_val = []
         return checklist_weights_val, checklist_weights_all_val
-
     elif input_id == "checklist-weights":
         if len(checklist_weights_opt) == len(checklist_weights_val):
             return checklist_weights_val, ["All"]
