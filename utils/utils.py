@@ -14,6 +14,11 @@ from sklearn.decomposition import PCA
 from statsmodels.graphics.gofplots import qqplot
 from statsmodels.stats.diagnostic import lilliefors
 
+import h5py
+import importlib
+import utils.SK_evaluation as evlSK
+importlib.reload(evlSK)
+
 matplotlib.use('Agg')
 
 def save_file(name, content, upload_directory):
@@ -22,7 +27,8 @@ def save_file(name, content, upload_directory):
     """
     data = content.encode("utf8").split(b";base64,")[1]
     with open(os.path.join(upload_directory, name), "wb") as fp:
-        fp.write(base64.decodebytes(data))
+        # fp.write(base64.decodebytes(data))
+        fp.write(base64.b64decode(data))
 
 def get_uploaded_files(upload_directory):
     """
@@ -54,6 +60,51 @@ def load_dataframe(filepath, sep=","):
 
     return df
 
+def load_dataframe_hdf5(filepath):
+    """
+    Read hdf5 file
+    """
+    data_arrays = {}
+    with h5py.File(filepath, "r") as hdf:
+        test_drives_group = hdf["TestDrives"]
+        for drive_name in test_drives_group.keys():
+            drive_group = test_drives_group[drive_name]  # Access the drive group
+            data_dict = {}
+            for column_name in drive_group.keys():
+                column_data = drive_group[column_name][:]
+                if column_data.dtype.names: 
+                    column_data = column_data[column_data.dtype.names[0]]
+                data_dict[column_name] = column_data
+            data_arrays[test_drives_group[drive_name].attrs["file_name"]] = pd.DataFrame(data_dict)
+    return data_arrays
+
+def load_metadata(filepath):
+    """
+    Read metadata from hdf5 file
+    """
+    try:
+        with h5py.File(filepath, "r") as hdf:
+            dataset = hdf["Configuration"]["Metadata"]
+            headers = dataset.dtype.names
+            data = list(dataset[()].tolist())
+            headers = [header.decode('utf-8') if isinstance(header, bytes) else header for header in headers]
+            return pd.DataFrame([data], columns=headers)
+    except KeyError:
+        raise ValueError(f"The dataset does not exist in the file '{filepath}'.")
+    except Exception as e:
+        raise RuntimeError(f"An error occurred while reading the HDF5 file: {e}")
+
+
+def load_triggers(rawDataDir):
+    with h5py.File(rawDataDir, "r") as hdf:
+        triggers_folder = hdf["Configuration"]["Maneuver Specification"]["Triggers"]
+        start = np.array(triggers_folder["Start"])
+        stop = np.array(triggers_folder["Stop"])
+    start = 100
+    stop = 9000
+    df = pd.DataFrame(data=np.array([[start, stop]]), columns=['Start Trigger', 'Stop Trigger'])
+    return df
+
 def delete_file(filename, upload_directory):
     """
     Delete file
@@ -65,7 +116,7 @@ def transform_data(data):
     """
     Transform data using PCA
     """
-    pca = PCA(n_components=len(data), whiten=False)
+    pca = PCA(n_compon9ents=len(data), whiten=False)
     
     data = np.asarray(data).T
     pca.fit(data)
@@ -105,6 +156,19 @@ def exctract_data(df):
             
     return obs_data
 
+def extract_data(df_list, triggers):
+    """
+    Extract dataframe and store them in a dictionary
+    """
+
+    all_data = {}
+    for tab in df_list:
+        datatable = pd.DataFrame(tab['props']['children'][0]['props']['data'])
+        file_name = tab['props']['value']
+        evaluation_list = SK_radius_eval(datatable, triggers)
+        all_data[file_name] = evaluation_list
+    return all_data
+
 def combine_tails(hist, bin_edges, expected_freq=5, tail=0):
     """
     Combine tails if number of bin count is less than expected freq
@@ -139,95 +203,151 @@ def combine_bins(hist, bin_edges, expected_freq=5):
     
     return hist, bin_edges
 
-def get_fig(data, fig_pca_all, fig_pca_group, fig_qq_plot):
+def get_fig(data, fig_mov_avg_all, fig_area_all):
     """
     Create plot fig for pca all, pca group, and qq plot
     """
     x_length = np.linspace(-2,2,100)
     bincount = 33
+
     row_num = 1
+    for name, single_obj in data.items():
+        r, r_avg, r_low_lim, r_up_lim, triggers = single_obj.radius_eval()
+        fig_mov_avg_all.add_trace(go.Scatter(
+            y=r,
+            mode='lines',
+            name='Radius',
+            line=dict(color='blue'),
+            legendgroup = str(row_num)
+        ), row=row_num, col=1)
 
-    for i,motion in enumerate(data.keys()):
-        for j,group in enumerate(data[motion].keys()):
-            if group == "all":
-                for k,dist in enumerate(["px", "py", "theta"]):
-                    dist_data = data[motion]["all"][dist]
-                    dist_data = np.asarray(dist_data)
-                    if dist != "theta":
-                        # create pca all plot
-                        fig_pca_all.append_trace(go.Scatter(
-                            x=x_length,
-                            y=stats.norm.pdf(x_length, loc=dist_data.mean(), scale=dist_data.std()),
-                            name=f"{motion}: PCA-all {dist} dist",
-                            legendgroup = i
-                            ), 
-                            row=i+1, col=1
-                        )
-                        fig_pca_all.append_trace(go.Histogram(
-                            x=dist_data,
-                            nbinsy=bincount,
-                            opacity=0.5,
-                            histnorm='probability density',
-                            name=f"{motion}: PCA-all {dist} hist",
-                            legendgroup = i
-                            ),  
-                            row=i+1, col=1
-                        )
-                    # create qq plot
-                    qqplot_data = qqplot(dist_data, 
-                                         loc=dist_data.mean(),
-                                         scale=dist_data.std(),
-                                         line='45')
-                                         
-                    mpl_lines = qqplot_data.gca().lines
-                    fig_qq_plot.append_trace(go.Scatter(
-                        x=mpl_lines[0].get_xdata(),
-                        y= mpl_lines[0].get_ydata(),
-                        mode='markers',
-                        marker= {'color': 'blue'}
+        # Add moving average line
+        fig_mov_avg_all.add_trace(go.Scatter(
+            y=r_avg,
+            mode='lines',
+            name='Moving average',
+            line=dict(color='lightblue'),
+            legendgroup = str(row_num)
+        ), row=row_num, col=1)
 
-                        ), 
-                        row=i+1, col=k+1
-                    )
-                    fig_qq_plot.append_trace(go.Scatter(
-                        x=mpl_lines[1].get_xdata(),
-                        y=mpl_lines[1].get_ydata(),
-                        mode='lines',
-                        marker= {'color': 'red'}
+        # Add area under average line
+        fig_area_all.add_trace(
+            go.Scatter(
+            y=r_avg,
+            mode='lines',
+            name='Moving average',
+            line=dict(color='lightblue'),
+            legendgroup = str(row_num)
+        ), row=row_num, col=1)
 
-                        ), 
-                        row=i+1, col=k+1
-                    )
-                    
-                    # close figure to avoid OOM
-                    matplotlib.pyplot.close(qqplot_data)
-            else:
-                for k,dist in enumerate(["px", "py", "theta"]):
-                    if dist != "theta":
-                        dist_data = data[motion][group][dist]
-                        dist_data = np.asarray(dist_data)
-                        fig_pca_group.append_trace(go.Scatter(
-                            x=x_length,
-                            y=stats.norm.pdf(x_length, loc=dist_data.mean(), scale=dist_data.std()),
-                            name=f"{motion}-{group}: {dist} distribution",
-                            legendgroup = row_num
-                            ), 
-                            row=row_num, col=1
-                        )
-                        fig_pca_group.append_trace(go.Histogram(
-                            x=dist_data,
-                            nbinsy=bincount,
-                            opacity=0.5,
-                            histnorm='probability density',
-                            name=f"{motion}-{group}: {dist} histogram",
-                            legendgroup = row_num
-                            ),  
-                            row=row_num, col=1
-                        )
+        # Add horizontal lines - common traces
+        trace1 = go.Scatter(
+            y=[r_low_lim] * len(r),
+            mode='lines',
+            name='Alarm',
+            line=dict(color='red', dash='dash'),
+            legendgroup = str(row_num)
+        )
+        trace2 = go.Scatter(
+            y=[r_up_lim] * len(r),
+            mode='lines',
+            showlegend=False,
+            line=dict(color='red', dash='dash'),
+            legendgroup = str(row_num)
+        )
+        trace3 = go.Scatter(
+            y=[39] * len(r),
+            mode='lines',
+            name='Warning',
+            line=dict(color='green', dash='dash'),
+            legendgroup = str(row_num)
+        )
+        trace4 = go.Scatter(
+            y=[40] * len(r),
+            mode='lines',
+            name='Target',
+            line=dict(color='black', dash='dash'),
+            legendgroup = str(row_num)
+        )
+        trace5 = go.Scatter(
+            y=[41] * len(r),
+            mode='lines',
+            showlegend=False,
+            line=dict(color='green', dash='dash'),
+            legendgroup = str(row_num)
+        )
+        fig_mov_avg_all.add_trace(trace1, row=row_num, col=1)
+        fig_mov_avg_all.add_trace(trace2, row=row_num, col=1)
+        fig_mov_avg_all.add_trace(trace3, row=row_num, col=1)
+        fig_mov_avg_all.add_trace(trace4, row=row_num, col=1)
+        fig_mov_avg_all.add_trace(trace5, row=row_num, col=1)
 
-                row_num += 1
+        fig_area_all.add_trace(trace1, row=row_num, col=1)
+        fig_area_all.add_trace(trace2, row=row_num, col=1)
+        fig_area_all.add_trace(trace3, row=row_num, col=1)
+        fig_area_all.add_trace(trace4, row=row_num, col=1)
+        fig_area_all.add_trace(trace5, row=row_num, col=1)
+        
+        # Add vertical lines for triggers
+        
+        fig_mov_avg_all.add_vline(
+            x=triggers['Start Trigger'],
+            line_dash="dashdot",
+            line_color="green",
+            name="Start trigger",
+            legendgroup = str(row_num),
+            row=row_num, col=1
+        )
+        
+        fig_mov_avg_all.add_vline(
+            x=triggers['Stop Trigger'],
+            line_dash="dashdot",
+            line_color="red",
+            name="Stop trigger",
+            legendgroup = str(row_num),
+            row=row_num, col=1
+        )
 
-    return fig_pca_all, fig_pca_group, fig_qq_plot
+        fig_mov_avg_all.update_xaxes(
+            title_text= "Samples",
+            row=row_num, col=1
+        )
+
+        fig_mov_avg_all.update_yaxes(
+            title_text="Radius [m]", 
+            row=row_num, col=1
+        ) 
+
+        fig_area_all.add_vline(
+            x=triggers['Start Trigger'],
+            line_dash="dashdot",
+            line_color="green",
+            name="Start trigger",
+            legendgroup = str(row_num),
+            row=row_num, col=1
+        )
+        
+        fig_area_all.add_vline(
+            x=triggers['Stop Trigger'],
+            line_dash="dashdot",
+            line_color="red",
+            name="Stop trigger",
+            legendgroup = str(row_num),
+            row=row_num, col=1
+        )
+
+        fig_area_all.update_xaxes(
+            title_text= "Samples",
+            row=row_num, col=1
+        )
+
+        fig_area_all.update_yaxes(
+            title_text="Radius [m]", 
+            row=row_num, col=1
+        ) 
+
+        row_num += 1
+    return fig_mov_avg_all, fig_area_all
 
 def compute_lilliefors(data):
     """
@@ -276,3 +396,16 @@ def compute_shapiro(data):
     """
     shapiro_stat, shapiro_pval = shapiro(data)
     return shapiro_stat, shapiro_pval
+
+def SK_radius_eval(eval_data, triggers):
+    
+    modul_R_param = evlSK.modul_R(eval_data['Radius'])
+    R = modul_R_param.compute_module_R()
+    module_dH_param = evlSK.modul_dH(eval_data['Lenkradwin'])
+    dH = module_dH_param.compute_module_dH()
+    modul_t_param = evlSK.modul_t(eval_data['Lenkradwin'])
+    t = modul_t_param.compute_module_t()
+    evaluation = 0.5 * R + 0.3 * dH + 0.2 * t
+
+    plot_res = evlSK.plotting(modul_R_param, module_dH_param, 1, triggers)
+    return plot_res

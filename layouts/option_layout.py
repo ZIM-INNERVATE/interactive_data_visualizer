@@ -16,7 +16,7 @@ option_layout = html.Div(
                                 'borderWidth': '1px','borderStyle': 'dashed','borderRadius': '5px',
                               'textAlign': 'center'},
                         id="upload-data",
-                        accept=".csv") 
+                        accept=".hdf5") 
                     ],
                     style={'padding': '10px 0px 10px 0px'}
                 ),
@@ -76,75 +76,75 @@ option_layout = html.Div(
                       ),
                     ],
                 ),
-                dbc.Row([
-                    html.Div([
-                        dbc.Form([
-                            dbc.Label("Groups"),
-                            dbc.Row([
-                              dbc.Col([
-                                dcc.Dropdown(id='dropdown-groups',   
-                                              style = {'width': '100%',
-                                                       'color': '#212121',
-                                                      },   
-                                              options = [],
-                                              value = [],
-                                              placeholder="Select group",
-                                              searchable=True,
-                                              clearable=True,
-                                              multi=True
-                                ),
-                              ])
-                            ]),
-                            dbc.Row([
-                              dbc.Col([
-                                dbc.Label("Motions"),
-                                dbc.Checklist(
-                                    options=[{'label': 'left', 'value':'left'},
-                                             {'label': 'straight', 'value':'straight'},
-                                             {'label': 'right', 'value':'right'}
-                                            ],
-                                    value=["left", "straight", "right"],
-                                    id="checklist-motions",
-                                    inline=False,
-                                    switch=True,
-                                ),
-                                dbc.Checklist(
-                                    options=[{'label': 'All', 'value':'All'}],
-                                    value=['All'],
-                                    id="checklist-motions-all",
-                                    inline=True,
-                                    switch=True,
-                                ),
-                              ]),
-                              dbc.Col([
-                                dbc.Label("Weights"),
-                                dbc.Checklist(
-                                    options=[{'label': 'small', 'value':'small'},
-                                             {'label': 'medium', 'value':'medium'},
-                                             {'label': 'large', 'value':'large'},
-                                            ],
-                                    value=["small", "medium", "large"],
-                                    id="checklist-weights",
-                                    inline=False,
-                                    switch=True,
-                                ),
-                                dbc.Checklist(
-                                    options=[{'label': 'All', 'value':'All'}],
-                                    value=['All'],
-                                    id="checklist-weights-all",
-                                    inline=True,
-                                    switch=True,
-                                ),
-                              ]),
-                            ],
-                            style={'padding': '10px 0px 10px 0px'}
-                            ),
-                        ]),
-                        html.P(id="form-checklist-button"),
-                    ],
-                  )],
-                  style={'padding': '10px 0px 10px 0px'}
-                ),
+                # dbc.Row([
+                #     html.Div([
+                #         dbc.Form([
+                #             dbc.Label("Groups"),
+                #             dbc.Row([
+                #               dbc.Col([
+                #                 dcc.Dropdown(id='dropdown-groups',   
+                #                               style = {'width': '100%',
+                #                                        'color': '#212121',
+                #                                       },   
+                #                               options = [],
+                #                               value = [],
+                #                               placeholder="Select group",
+                #                               searchable=True,
+                #                               clearable=True,
+                #                               multi=True
+                #                 ),
+                #               ])
+                #             ]),
+                #             dbc.Row([
+                #               dbc.Col([
+                #                 dbc.Label("Motions"),
+                #                 dbc.Checklist(
+                #                     options=[{'label': 'left', 'value':'left'},
+                #                              {'label': 'straight', 'value':'straight'},
+                #                              {'label': 'right', 'value':'right'}
+                #                             ],
+                #                     value=["left", "straight", "right"],
+                #                     id="checklist-motions",
+                #                     inline=False,
+                #                     switch=True,
+                #                 ),
+                #                 dbc.Checklist(
+                #                     options=[{'label': 'All', 'value':'All'}],
+                #                     value=['All'],
+                #                     id="checklist-motions-all",
+                #                     inline=True,
+                #                     switch=True,
+                #                 ),
+                #               ]),
+                #               dbc.Col([
+                #                 dbc.Label("Weights"),
+                #                 dbc.Checklist(
+                #                     options=[{'label': 'small', 'value':'small'},
+                #                              {'label': 'medium', 'value':'medium'},
+                #                              {'label': 'large', 'value':'large'},
+                #                             ],
+                #                     value=["small", "medium", "large"],
+                #                     id="checklist-weights",
+                #                     inline=False,
+                #                     switch=True,
+                #                 ),
+                #                 dbc.Checklist(
+                #                     options=[{'label': 'All', 'value':'All'}],
+                #                     value=['All'],
+                #                     id="checklist-weights-all",
+                #                     inline=True,
+                #                     switch=True,
+                #                 ),
+                #               ]),
+                #             ],
+                #             style={'padding': '10px 0px 10px 0px'}
+                #             ),
+                #         ]),
+                #         html.P(id="form-checklist-button"),
+                #     ],
+                #   )],
+                #   style={'padding': '10px 0px 10px 0px'}
+                # ),
             ],
     ),
   ]

@@ -10,16 +10,34 @@ visualization_layout = html.Div(
               parent_className='custom-tabs',
               className='custom-tabs-container',
               children=[
-                  dcc.Tab(label='Data', value='tab-data',
+                   dcc.Tab(label='HDF5 Data', value='tab-data-hdf5',
                       children=[
                           html.Div([
-                              html.Label("Experimentation Data", 
+                              html.Label("HDF5 Data Tables", 
+                                      style = {'color': 'black',
+                                              'textAlign': 'center',
+                                              'fontWeight': 'bold'},
+                                    ),
+                              dcc.Tabs(
+                                  id='hdf5-data-tabs',
+                                  className='custom-tabs-container',
+                              ),
+                          ]),
+                          html.Div(id='hdf5-data-tables-container')
+                      ],
+                      className='custom-tab',
+                      selected_className='custom-tab--selected',
+                  ),
+                  dcc.Tab(label='Metadata', value='tab-metadata',
+                      children=[
+                          html.Div([
+                              html.Label("Group Metadata", 
                                       style = {'color': 'black',
                                               'textAlign': 'center',
                                               'fontWeight': 'bold'},
                                     ),
                               dash_table.DataTable(
-                                  id="experimentation-data",
+                                  id="metadata-data",
                                   style_data={'color': 'black'},
                                   style_cell={'textAlign': 'center'},
                                   style_data_conditional=[
@@ -30,7 +48,27 @@ visualization_layout = html.Div(
                                       }
                                   ],
                                   page_size=25,
-                                  style_table={'height': '720px', 'overflowY': 'auto'},
+                                  style_table={'height': '120px', 'overflowY': 'auto'},
+                                  style_header={
+                                      'backgroundColor': 'rgb(210, 210, 210)',
+                                      'color': 'black',
+                                      'fontWeight': 'bold',
+                                      'textAlign': 'center'
+                                  }
+                              ),
+                              dash_table.DataTable(
+                                  id="triggers-data",
+                                  style_data={'color': 'black'},
+                                  style_cell={'textAlign': 'center'},
+                                  style_data_conditional=[
+                                      {
+                                          'if': {'row_index': 'odd'},
+                                          'backgroundColor': 'rgb(220, 220, 220)',
+                                          'textAlign': 'center'
+                                      }
+                                  ],
+                                  page_size=25,
+                                  style_table={'height': '120px', 'overflowY': 'auto'},
                                   style_header={
                                       'backgroundColor': 'rgb(210, 210, 210)',
                                       'color': 'black',
@@ -45,24 +83,24 @@ visualization_layout = html.Div(
                       className='custom-tab',
                       selected_className='custom-tab--selected',
                   ),
-                  dcc.Tab(label='Scatter Plot', value='tab-scatter',
+                  dcc.Tab(label='Area calculation', value='tab-area',
                       children=[
-                          dcc.Graph(id='xy-scatter',
-                                    #figure=dict(layout=dict(autosize=False)),
+                          dcc.Graph(id='area_under_radius',
                                     config={'displayModeBar': True},
-                                    # config={'displayModeBar': True, 'responsive': True},
-                                    animate=True,
-                                    ),
+                                    animate=True),
+                #           dcc.Graph(id='xy-scatter',
+                #                     #figure=dict(layout=dict(autosize=False)),
+                #                     config={'displayModeBar': True},
+                #                     # config={'displayModeBar': True, 'responsive': True},
+                #                     animate=True,
+                #                     ),
                       ],
                       className='custom-tab',
                       selected_className='custom-tab--selected',
                   ),
-                  dcc.Tab(label='Distribution and Histogram', value='tab-histogram',
+                  dcc.Tab(label='Moving Average for Radius', value='tab-avg-radius',
                       children=[
-                          dcc.Graph(id='pca-all-fig',
-                                    config={'displayModeBar': True},
-                                    animate=True),
-                          dcc.Graph(id='pca-group-fig',
+                          dcc.Graph(id='mov_avg_radius',
                                     config={'displayModeBar': True},
                                     animate=True),
                       ],
