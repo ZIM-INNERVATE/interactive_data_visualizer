@@ -203,151 +203,225 @@ def combine_bins(hist, bin_edges, expected_freq=5):
     
     return hist, bin_edges
 
-def get_fig(data, fig_mov_avg_all, fig_area_all):
+def get_fig_area(data, fig_area_all):
     """
-    Create plot fig for pca all, pca group, and qq plot
+    Create plot fig
     """
-    x_length = np.linspace(-2,2,100)
-    bincount = 33
-
+    shapes = []
     row_num = 1
     for name, single_obj in data.items():
         r, r_avg, r_low_lim, r_up_lim, triggers = single_obj.radius_eval()
-        fig_mov_avg_all.add_trace(go.Scatter(
-            y=r,
-            mode='lines',
-            name='Radius',
-            line=dict(color='blue'),
-            legendgroup = str(row_num)
-        ), row=row_num, col=1)
-
-        # Add moving average line
-        fig_mov_avg_all.add_trace(go.Scatter(
-            y=r_avg,
-            mode='lines',
-            name='Moving average',
-            line=dict(color='lightblue'),
-            legendgroup = str(row_num)
-        ), row=row_num, col=1)
-
-        # Add area under average line
-        fig_area_all.add_trace(
-            go.Scatter(
-            y=r_avg,
-            mode='lines',
-            name='Moving average',
-            line=dict(color='lightblue'),
-            legendgroup = str(row_num)
-        ), row=row_num, col=1)
-
-        # Add horizontal lines - common traces
-        trace1 = go.Scatter(
-            y=[r_low_lim] * len(r),
-            mode='lines',
-            name='Alarm',
-            line=dict(color='red', dash='dash'),
-            legendgroup = str(row_num)
-        )
-        trace2 = go.Scatter(
-            y=[r_up_lim] * len(r),
-            mode='lines',
-            showlegend=False,
-            line=dict(color='red', dash='dash'),
-            legendgroup = str(row_num)
-        )
-        trace3 = go.Scatter(
-            y=[39] * len(r),
-            mode='lines',
-            name='Warning',
-            line=dict(color='green', dash='dash'),
-            legendgroup = str(row_num)
-        )
-        trace4 = go.Scatter(
-            y=[40] * len(r),
-            mode='lines',
-            name='Target',
-            line=dict(color='black', dash='dash'),
-            legendgroup = str(row_num)
-        )
-        trace5 = go.Scatter(
-            y=[41] * len(r),
-            mode='lines',
-            showlegend=False,
-            line=dict(color='green', dash='dash'),
-            legendgroup = str(row_num)
-        )
-        fig_mov_avg_all.add_trace(trace1, row=row_num, col=1)
-        fig_mov_avg_all.add_trace(trace2, row=row_num, col=1)
-        fig_mov_avg_all.add_trace(trace3, row=row_num, col=1)
-        fig_mov_avg_all.add_trace(trace4, row=row_num, col=1)
-        fig_mov_avg_all.add_trace(trace5, row=row_num, col=1)
-
-        fig_area_all.add_trace(trace1, row=row_num, col=1)
-        fig_area_all.add_trace(trace2, row=row_num, col=1)
-        fig_area_all.add_trace(trace3, row=row_num, col=1)
-        fig_area_all.add_trace(trace4, row=row_num, col=1)
-        fig_area_all.add_trace(trace5, row=row_num, col=1)
         
-        # Add vertical lines for triggers
-        
-        fig_mov_avg_all.add_vline(
-            x=triggers['Start Trigger'],
-            line_dash="dashdot",
-            line_color="green",
-            name="Start trigger",
-            legendgroup = str(row_num),
-            row=row_num, col=1
-        )
-        
-        fig_mov_avg_all.add_vline(
-            x=triggers['Stop Trigger'],
-            line_dash="dashdot",
-            line_color="red",
-            name="Stop trigger",
-            legendgroup = str(row_num),
-            row=row_num, col=1
-        )
+        # Add horizontal lines with drag capability
+        h_lines = [
+            (r_low_lim, 'Alarm', 'red', True, 'r_low_lim'),
+            (r_up_lim, 'Alarm', 'red', False, 'r_up_lim'),
+            (39, 'Warning', 'green', True, 'warning_low'),
+            (40, 'Target', 'black', True, 'target'),
+            (41, 'Warning', 'green', False, 'warning_high')
+        ]
 
-        fig_mov_avg_all.update_xaxes(
-            title_text= "Samples",
-            row=row_num, col=1
-        )
+        # Store current line positions
+        line_positions = {
+            'r_low_lim': r_low_lim,
+            'r_up_lim': r_up_lim,
+            'warning_low': 39,
+            'target': 40,
+            'warning_high': 41,
+            'start_trigger': triggers['Start Trigger'],
+            'stop_trigger': triggers['Stop Trigger']
+        }
 
-        fig_mov_avg_all.update_yaxes(
-            title_text="Radius [m]", 
-            row=row_num, col=1
-        ) 
+        for y_val, name, color, show_legend, line_id in h_lines:
+            trace = go.Scatter(
+                y=[y_val] * len(r_avg), mode='lines',
+                name=name, showlegend=show_legend,
+                line=dict(color=color, dash='dash'),
+                legendgroup=row_num,
+                customdata=[line_id],  # Store line identifier
+                hovertemplate=f"{name}: %{{y:.2f}}<extra></extra>",
+            )
+            fig_area_all.add_trace(trace, row=row_num, col=1)
 
-        fig_area_all.add_vline(
-            x=triggers['Start Trigger'],
-            line_dash="dashdot",
-            line_color="green",
-            name="Start trigger",
-            legendgroup = str(row_num),
-            row=row_num, col=1
-        )
+        # Add vertical lines with drag capability
+        v_lines = [
+            (triggers['Start Trigger'], 'Start trigger', 'green', True, 'start_trigger'),
+            (triggers['Stop Trigger'], 'Stop trigger', 'red', True, 'stop_trigger')
+        ]
+        for x_val, name, color, show_legend, line_id in v_lines:
+            trace = go.Scatter(
+                x=[None], mode='markers',
+                marker=dict(color=color, size=10),
+                name=name, showlegend=show_legend,
+                legendgroup=row_num,
+                customdata=[line_id],  # Store line identifier
+                hovertemplate=f"{name}: %{{y:.2f}}<extra></extra>",
+            )
+            fig_area_all.add_trace(trace, row=row_num, col=1)
         
-        fig_area_all.add_vline(
-            x=triggers['Stop Trigger'],
-            line_dash="dashdot",
-            line_color="red",
-            name="Stop trigger",
-            legendgroup = str(row_num),
-            row=row_num, col=1
-        )
+            # Add shape for vertical line with correct subplot reference
+            shapes.append({
+                "type": "line",
+                "x0": x_val, 
+                "x1": x_val, 
+                "y0": min(r), 
+                "y1": max(r),
+                "xref": f"x{row_num}", 
+                "yref": f"y{row_num}",
+                "line": {"color": color, "width": 3},
+            })
+
+        def update_areas(line_positions, r_avg):
+            """Helper function to create area traces with updated positions"""
+            return [
+                (r_avg, None, 'Moving average', 'lightblue', None, True),
+                ([min(max(val, line_positions['r_low_lim']), line_positions['r_up_lim']) for val in r_avg], 
+                 'tonexty', 'Outside of limits', 'rgba(0,0,0,0)', 'rgba(255,0,0,0.5)', True),
+                ([min(max(val, line_positions['warning_low']), line_positions['r_up_lim']) for val in r_avg], 
+                 'tonexty', 'Inside radius range', 'rgba(0,0,0,0)', 'rgba(255,165,0,0.3)', False),
+                ([max(min(val, line_positions['warning_high']), line_positions['r_low_lim']) for val in r_avg], 
+                 'tonexty', 'Inside radius range', 'rgba(0,0,0,0)', 'rgba(255,165,0,0.5)', True),
+                ([min(max(val, line_positions['target']), line_positions['warning_high']) for val in r_avg], 
+                 'tonexty', 'Optimal radius', 'rgba(0,0,0,0)', 'rgba(11, 156, 49,0.1)', False),
+                ([max(min(val, line_positions['target']), line_positions['warning_low']) for val in r_avg], 
+                 'tonexty', 'Optimal radius', 'rgba(0,0,0,0)', 'rgba(11, 156, 49, 0.3)', True)
+            ]
+
+        # Initial area traces
+        area_traces = update_areas(line_positions, r_avg)
+        
+        for y, fill, name, line_color, fillcolor, show_legend in area_traces:
+            fig_area_all.add_trace(go.Scatter(
+                y=y, fill=fill, name=name,
+                mode='lines', line_color=line_color,
+                fillcolor=fillcolor, legendgroup=row_num,
+                showlegend=show_legend
+            ), row=row_num, col=1)
 
         fig_area_all.update_xaxes(
-            title_text= "Samples",
-            row=row_num, col=1
+            title_text="Samples", 
+            row=row_num, 
+            col=1
         )
-
         fig_area_all.update_yaxes(
             title_text="Radius [m]", 
-            row=row_num, col=1
-        ) 
-
+            row=row_num, 
+            col=1,
+            range=[min(r), max(r)] 
+        )
         row_num += 1
-    return fig_mov_avg_all, fig_area_all
+
+    fig_area_all.update_layout(
+        dragmode=False,  # Disable zoom & pan
+        showlegend=True, 
+        height=300*row_num, 
+        # autosize=True,
+        shapes=shapes  # Add shapes to plot
+    )
+    return fig_area_all
+
+def get_fig_avg(data, fig_mov_avg_all):
+    """
+    Create plot fig
+    """
+    shapes = []
+    row_num = 1
+    for name, single_obj in data.items():
+        r, r_avg, r_low_lim, r_up_lim, triggers = single_obj.radius_eval()
+        
+        # Add radius and moving average lines
+        traces = [
+            (r, 'Radius', 'blue', None),
+            (r_avg, 'Moving average', 'lightblue', None)
+        ]
+        
+        for y, name, color, _ in traces:
+            fig_mov_avg_all.add_trace(go.Scatter(
+                y=y, mode='lines', name=name,
+                line=dict(color=color),
+                legendgroup=row_num
+            ), row=row_num, col=1)
+
+        # Add horizontal lines with drag capability
+        h_lines = [
+            (r_low_lim, 'Alarm', 'red', True, 'r_low_lim'),
+            (r_up_lim, 'Alarm', 'red', False, 'r_up_lim'),
+            (39, 'Warning', 'green', True, 'warning_low'),
+            (40, 'Target', 'black', True, 'target'),
+            (41, 'Warning', 'green', False, 'warning_high')
+        ]
+
+        # Store current line positions
+        line_positions = {
+            'r_low_lim': r_low_lim,
+            'r_up_lim': r_up_lim,
+            'warning_low': 39,
+            'target': 40,
+            'warning_high': 41,
+            'start_trigger': triggers['Start Trigger'],
+            'stop_trigger': triggers['Stop Trigger']
+        }
+
+        for y_val, name, color, show_legend, line_id in h_lines:
+            trace = go.Scatter(
+                y=[y_val] * len(r), mode='lines',
+                name=name, showlegend=show_legend,
+                line=dict(color=color, dash='dash'),
+                legendgroup=row_num,
+                customdata=[line_id],  # Store line identifier
+                hovertemplate=f"{name}: %{{y:.2f}}<extra></extra>",
+            )
+            fig_mov_avg_all.add_trace(trace, row=row_num, col=1)
+
+        # Add vertical lines with drag capability
+        v_lines = [
+            (triggers['Start Trigger'], 'Start trigger', 'green', True, 'start_trigger'),
+            (triggers['Stop Trigger'], 'Stop trigger', 'red', True, 'stop_trigger')
+        ]
+        for x_val, name, color, show_legend, line_id in v_lines:
+            trace = go.Scatter(
+                x=[None], mode='markers',
+                marker=dict(color=color, size=10),
+                name=name, showlegend=show_legend,
+                legendgroup=row_num,
+                customdata=[line_id],  # Store line identifier
+                hovertemplate=f"{name}: %{{y:.2f}}<extra></extra>",
+            )
+            fig_mov_avg_all.add_trace(trace, row=row_num, col=1)
+            
+            # Add shape for vertical line with correct subplot reference
+            shapes.append({
+                "type": "line",
+                "x0": x_val, 
+                "x1": x_val, 
+                "y0": min(r) - 1, 
+                "y1": max(r) + 1,
+                "xref": f"x{row_num}", 
+                "yref": f"y{row_num}",
+                "line": {"color": color, "width": 3},
+            })
+            
+        fig_mov_avg_all.update_xaxes(
+            title_text="Samples", 
+            row=row_num, 
+            col=1
+        )
+        fig_mov_avg_all.update_yaxes(
+            title_text="Radius [m]", 
+            row=row_num, 
+            col=1,
+            range=[min(r) - 1, max(r) + 1] 
+        )    
+        row_num += 1
+    
+    fig_mov_avg_all.update_layout(
+        dragmode=False,  # Disable zoom & pan
+        showlegend=True,  
+        # autosize=True,
+        height=300*row_num,
+        shapes=shapes  # Add shapes to plot
+    )
+    return fig_mov_avg_all
 
 def compute_lilliefors(data):
     """

@@ -97,107 +97,115 @@ def update_weight_checklist(checklist_weights_all_val,
             return checklist_weights_val, []
 
 @app.callback([Output('mov_avg_radius', 'figure'),
-               Output('area_under_radius', 'figure')],
+               Output("store_avg", "data"),],
               [Input('hdf5-data-tabs', 'children'),
-               Input('triggers-data', 'data'),],
-              prevent_initial_call=True,
+               Input('triggers-data', 'data'),
+               Input('mov_avg_radius', 'clickData'),
+               Input('mov_avg_radius', 'hoverData'),
+               Input('mov_avg_radius', 'relayoutData'),],
+              [State("store_avg", "data"),
+               State('mov_avg_radius', 'figure'),],
+            #   prevent_initial_call=True,
              )
-def update_graphs(hdf5_experimentation_data, triggers_data):
+def update_graphs_avg(hdf5_experimentation_data, triggers_data,
+                  clickData, hoverData, relayoutData, store_data, figure):
     if hdf5_experimentation_data:
         df_list = hdf5_experimentation_data # pd.DataFrame.from_records(hdf5_experimentation_data)
-        if df_list:
+        if df_list and figure == None:
             num_group_subplots = len(df_list)
+            triggers_data = triggers_data[0]
             extracted_df = utils.extract_data(df_list, triggers_data)
             file_names = ["Test run " + name[:-4] for name, _ in extracted_df.items()]
-            # # create scatter plot
-            # fig_scatter = px.scatter(df,
-            #             x="x",
-            #             y="y",
-            #             title="End robot position for left, straight, and right motions",
-            #             color=df["group"].astype(str),
-            #             hover_data=["group"],
-            #             template='plotly',
-            #             height=800,
-            #             width=1200,
-            # )
-            # fig_scatter.update_layout(legend_title="Group")
-            # fig_scatter.update_layout(title_x=0.5)
-
-            # Create distribution and hist plot for all data
 
             fig_mov_avg_all = make_subplots(rows=num_group_subplots, cols=1, 
                                     subplot_titles=tuple(file_names), 
-                                    vertical_spacing=0.07,
-                                    
-                                    #shared_xaxes=True,
+                                    vertical_spacing=0.045,
                                     )
+            fig_mov_avg_all.update_layout(title_text="<b>Moving average for all runs in the group<b>",
+                    title_x=0.5,
+                    dragmode=False,
+                    height=900*num_group_subplots/3.,
+                    showlegend=True,
+                    legend_tracegroupgap = 80*num_group_subplots/3.25,
+            )
+            fig_mov_avg_all = utils.get_fig_avg(extracted_df, fig_mov_avg_all)
+            return fig_mov_avg_all, store_data
+        
+        elif figure != None: 
+            fig_mov_avg_all = go.Figure(figure)
+            vertical_threshold = 100
+            if clickData:
+                point = clickData["points"][0]
+                x = point["x"]
+                # Sensitivity for detecting line clicks
+                if abs(x - store_data["x_start_trigger"]) < vertical_threshold:
+                    store_data["dragging"] = "start_trigger"  # Start dragging vertical line
+                elif abs(x - store_data["x_stop_trigger"]) < vertical_threshold:
+                    store_data["dragging"] = "stop_trigger"  # Start dragging vertical line
+            if hoverData and store_data["dragging"]:
+                point = hoverData["points"][0]
+                x = point["x"]
+                print('X Position:', x)
+                # Print when hovering over lines
+                if abs(x - store_data["x_start_trigger"]) < vertical_threshold:
+                    print(f"{x}: start trigger")
+                if abs(x - store_data["x_stop_trigger"]) < vertical_threshold:
+                    print(f"{x}: stop trigger")
+                shapes = fig_mov_avg_all["layout"]["shapes"]
+                
+                # Smoothly move the vertical line
+                if store_data["dragging"] == "start_trigger":
+                    shapes[0]["x0"] = shapes[0]["x1"] = x  # Move vertical line
+                    store_data["x_start_trigger"] = x  # Update the x-coordinate of the line
+                elif store_data["dragging"] == "stop_trigger":
+                    shapes[1]["x0"] = shapes[1]["x1"] = x  # Move vertical line 2
+                    store_data["x_stop_trigger"] = x  
+                fig_mov_avg_all["layout"]["shapes"] = shapes  # Apply changes to the figure
+            
+            if relayoutData:
+                store_data["dragging"] = None  # Stop dragging when the mouse is released
+            return fig_mov_avg_all, store_data  #fig_scatter (as first argument) fig_qq_plot(as last argument)
+        else:
+            return px.scatter(), None
+    else:
+        raise dash.exceptions.PreventUpdate
+    
+@app.callback([Output('area_under_radius', 'figure'),
+               Output("store_area", "data"),],
+              [Input('hdf5-data-tabs', 'children'),
+               Input('triggers-data', 'data'),
+               Input('area_under_radius', 'clickData'),
+               Input('area_under_radius', 'hoverData'),
+               Input('area_under_radius', 'relayoutData'),],
+              [State("store_area", "data"),
+               State('area_under_radius', 'figure'),],
+            #   prevent_initial_call=True,
+             )
+def update_graphs_area(hdf5_experimentation_data, triggers_data,
+                  clickData, hoverData, relayoutData, store_data, figure):
+    if hdf5_experimentation_data:
+        df_list = hdf5_experimentation_data 
+        if df_list:
+            num_group_subplots = len(df_list)
+            triggers_data = triggers_data[0]
+            extracted_df = utils.extract_data(df_list, triggers_data)
+            file_names = ["Test run " + name[:-4] for name, _ in extracted_df.items()]
             fig_area_all = make_subplots(rows=num_group_subplots, cols=1, 
                                     subplot_titles=tuple(file_names), # tuple([" "]*num_group_subplots)
-                                    vertical_spacing=0.07,
-                                    #shared_xaxes=True,
+                                    vertical_spacing=0.045,
                                     )
-            # fig_qq_plot = make_subplots(rows=3, cols=3, 
-            #                             subplot_titles=tuple([" "]*9), 
-            #                             #shared_xaxes=True,
-            #                             horizontal_spacing = 0.05)
-            # update layout for pca all
-            fig_mov_avg_all.update_layout(title_text="Moving average for all runs in the group",
-                    #title_x=0.5, #center title
-                    height=800*num_group_subplots/3,
-                    width=1200,
-                    autosize = True,
-                    legend_tracegroupgap = 80*num_group_subplots/3,)
-            # update layout for pca group
-            fig_area_all.update_layout(title_text="Area under the radius curve for all runs in the group",
-                    #title_x=0.5, #center title
-                    height=800*num_group_subplots/3,
-                    width=1200,
-                    autosize = True,
-                    legend_tracegroupgap = 80*num_group_subplots/3,)
-            # update layout on qq plot on all data
-            # fig_qq_plot.update_layout(title_text="Quantile-Quantile Plot (QQ Plot) on all data",
-            #           height=1200,
-            #           width=1200,
-            #           autosize = True,
-            #           showlegend=False,)
-            
-            # get pca all, pca group, qq plot
-            #fig_mov_avg_all, fig_area_all, fig_qq_plot
-            fig_mov_avg_all, fig_area_all = utils.get_fig(extracted_df, 
-                                                          fig_mov_avg_all, 
-                                                          fig_area_all) 
-                                                        # fig_qq_plot)
-
-            # update subplot title and axes label
-            # pca_plt_num = 0
-            # qq_plt_num = 0
-            # for i,motion in enumerate(extracted_df):
-            #     for j,group in enumerate(extracted_df[motion]):
-            #         if group == "all":
-            #             for k,dist in enumerate(["px", "py", "theta"]):
-            #                 # qq subplot title
-            #                 fig_qq_plot.layout.annotations[qq_plt_num].update(text=f"{motion} motion - {dist}")
-            #                 fig_qq_plot.update_xaxes(
-            #                             title_text= "Theoritical Quantities",
-            #                             zeroline= False,
-            #                             row=i+1, col=k+1
-            #                 )
-            #                 fig_qq_plot.update_yaxes(
-            #                             title_text= "Sample Quantities",
-            #                             row=i+1, col=k+1
-            #                 )
-            #                 qq_plt_num += 1
-            #         else:
-            #             # group pca subplot title
-            #             fig_area_all.layout.annotations[pca_plt_num].update(text=f"{motion} motion - group {group} pose distribution")
-            #             pca_plt_num += 1
-                
-            #     # all pca subplot title
-            #     fig_mov_avg_all.layout.annotations[i].update(text=f"{motion} motion pose distribution")
-
-            return fig_mov_avg_all, fig_area_all #fig_scatter (as first argument) fig_qq_plot(as last argument)
+            fig_area_all.update_layout(title_text="<b>Area under the radius curve for all runs in the group<b>",
+                    title_x=0.5,
+                    dragmode=False,
+                    height=900*num_group_subplots/3.,
+                    # autosize=True,
+                    showlegend=True,
+                    legend_tracegroupgap = 80*num_group_subplots/4.07,
+                )
+            fig_area_all = utils.get_fig_area(extracted_df, fig_area_all) 
+            return fig_area_all, store_data  
         else:
-            return px.scatter(), px.scatter()
+            return px.scatter(), None
     else:
         raise dash.exceptions.PreventUpdate
 
@@ -208,10 +216,11 @@ def update_graphs(hdf5_experimentation_data, triggers_data):
                Output('normality-test-table-chi2', 'data'),
                Output('normality-test-table-chi2', 'columns')],
               [Input('hdf5-data-tabs', 'children'),
-               Input('triggers-data', 'data'),],
+               Input('triggers-data', 'data'),
+               Input('fake', 'data')],
               prevent_initial_call=True,
              )
-def update_normality_table(hdf5_experimentation_data, triggers):
+def update_normality_table(hdf5_experimentation_data, triggers, fake):
     if hdf5_experimentation_data:
         significance = 0.05
         # df = pd.DataFrame.from_records(hdf5_experimentation_data)

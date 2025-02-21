@@ -159,7 +159,7 @@ class plotting:
         self.modul_R_param = modul_R
         self.modul_dH_param = modul_dH
         self.axs = axs_dH
-        self.triggers = triggers[0]
+        self.triggers = triggers
 
     def plot_mov_aver_R(self):
         fig, axs = plt.subplots(2)
@@ -187,8 +187,8 @@ class plotting:
             ax.axhline(y=40, color='black', linestyle='--', label='Target')
             ax.axhline(y=41, color='g', linestyle='--', label='Warning')
             ax.plot(self.modul_R_param.avg_radius, color='lightblue', label='Moving average')
-            ax.axvline(x = self.triggers['Start Trigger'], color = 'g', linestyle='-.', label = 'Start trigger')
-            ax.axvline(x = self.triggers['Stop Trigger'], color = 'r', linestyle='-.', label = 'Stop trigger')
+            # ax.axvline(x = self.triggers['Start Trigger'], color = 'g', linestyle='-.', label = 'Start trigger')
+            # ax.axvline(x = self.triggers['Stop Trigger'], color = 'r', linestyle='-.', label = 'Stop trigger')
 
         # axs[0].plot(self.modul_R_param.avg_radius_, color='azure', label='Moving average 2')
         # axs[0].plot(self.modul_R_param.avg_radius_conv, color='yellow', label='Moving average conv')

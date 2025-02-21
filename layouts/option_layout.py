@@ -5,7 +5,7 @@ option_layout = html.Div(
   className='three columns div-user-controls',
   children=[
     html.H3('Interactive Data Visualizer'),
-    html.P('Data Analysis and Visualization for Scientific Experimentation and Evaluation'),
+    html.P('Data Analysis and Visualization for Maneuvers'),
     html.Div(
         className='div-for-dropdown',
             children=[
