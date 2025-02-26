@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import utils.utils as utils
+import copy
 from app import app
 from dash.dependencies import Input, Output, State
 from plotly.subplots import make_subplots
@@ -96,118 +97,275 @@ def update_weight_checklist(checklist_weights_all_val,
         else:
             return checklist_weights_val, []
 
-@app.callback([Output('mov_avg_radius', 'figure'),
-               Output("store_avg", "data"),],
-              [Input('hdf5-data-tabs', 'children'),
-               Input('triggers-data', 'data'),
-               Input('mov_avg_radius', 'clickData'),
-               Input('mov_avg_radius', 'hoverData'),
-               Input('mov_avg_radius', 'relayoutData'),],
-              [State("store_avg", "data"),
-               State('mov_avg_radius', 'figure'),],
-            #   prevent_initial_call=True,
-             )
-def update_graphs_avg(hdf5_experimentation_data, triggers_data,
-                  clickData, hoverData, relayoutData, store_data, figure):
-    if hdf5_experimentation_data:
-        df_list = hdf5_experimentation_data # pd.DataFrame.from_records(hdf5_experimentation_data)
-        if df_list and figure == None:
-            num_group_subplots = len(df_list)
-            triggers_data = triggers_data[0]
-            extracted_df = utils.extract_data(df_list, triggers_data)
-            file_names = ["Test run " + name[:-4] for name, _ in extracted_df.items()]
+# @app.callback([Output('mov_avg_radius', 'figure'),
+            #    Output("store_avg", "data"),],
+            #   [Input('hdf5-data-tabs', 'children'),
+            #    Input('triggers-data', 'data'),
+            #    Input('mov_avg_radius', 'clickData'),
+            #    Input('mov_avg_radius', 'hoverData'),
+            #    Input('mov_avg_radius', 'relayoutData'),],
+            #   [State("store_avg", "data"),
+            #    State('mov_avg_radius', 'figure'),],
+              ##prevent_initial_call=True,
+            #  )
+# def update_graphs_avg(hdf5_experimentation_data, triggers_data,
+                #   clickData, hoverData, relayoutData, store_data, figure):
+    # if hdf5_experimentation_data:
+        # df_list = hdf5_experimentation_data # pd.DataFrame.from_records(hdf5_experimentation_data)
+        # if df_list and figure == None:
+            # num_group_subplots = len(df_list)
+            # triggers_data = triggers_data[0]
+            # extracted_df = utils.extract_data(df_list, triggers_data)
+            # file_names = ["Test run " + name[:-4] for name, _ in extracted_df.items()]
+# 
+            # fig_mov_avg_all = make_subplots(rows=num_group_subplots, cols=1, 
+                                    # subplot_titles=tuple(file_names), 
+                                    # vertical_spacing=0.045,
+                                    # )
+            # fig_mov_avg_all.update_layout(title_text="<b>Moving average for all runs in the group<b>",
+                    # title_x=0.5,
+                    # dragmode=False,
+                    # height=900*num_group_subplots/3.,
+                    # showlegend=True,
+                    # legend_tracegroupgap = 80*num_group_subplots/3.25,
+            # )
+            # fig_mov_avg_all = utils.get_fig_avg(extracted_df, fig_mov_avg_all)
+            # return fig_mov_avg_all, store_data
+        # 
+        # elif figure != None: 
+            # fig_mov_avg_all = go.Figure(figure)
+            # vertical_threshold = 100
+            # if clickData:
+                # point = clickData["points"][0]
+                # x = point["x"]
+                ##Sensitivity for detecting line clicks
+                # if abs(x - store_data["x_start_trigger"]) < vertical_threshold:
+                    # store_data["dragging"] = "start_trigger"  # Start dragging vertical line
+                # elif abs(x - store_data["x_stop_trigger"]) < vertical_threshold:
+                    # store_data["dragging"] = "stop_trigger"  # Start dragging vertical line
+            # if hoverData and store_data["dragging"]:
+                # point = hoverData["points"][0]
+                # x = point["x"]
+                # print('X Position:', x)
+                ##Print when hovering over lines
+                # if abs(x - store_data["x_start_trigger"]) < vertical_threshold:
+                    # print(f"{x}: start trigger")
+                # if abs(x - store_data["x_stop_trigger"]) < vertical_threshold:
+                    # print(f"{x}: stop trigger")
+                # shapes = fig_mov_avg_all["layout"]["shapes"]
+                # 
+                ##Smoothly move the vertical line
+                # if store_data["dragging"] == "start_trigger":
+                    # shapes[0]["x0"] = shapes[0]["x1"] = x  # Move vertical line
+                    # store_data["x_start_trigger"] = x  # Update the x-coordinate of the line
+                # elif store_data["dragging"] == "stop_trigger":
+                    # shapes[1]["x0"] = shapes[1]["x1"] = x  # Move vertical line 2
+                    # store_data["x_stop_trigger"] = x  
+                # fig_mov_avg_all["layout"]["shapes"] = shapes  # Apply changes to the figure
+            # 
+            # if relayoutData:
+                # store_data["dragging"] = None  # Stop dragging when the mouse is released
+            # return fig_mov_avg_all, store_data  #fig_scatter (as first argument) fig_qq_plot(as last argument)
+        # else:
+            # return px.scatter(), None
+    # else:
+        # raise dash.exceptions.PreventUpdate
+    # 
+# @app.callback([Output('area_under_radius', 'figure'),
+            #    Output("store_area", "data"),],
+            #   [Input('hdf5-data-tabs', 'children'),
+            #    Input('triggers-data', 'data'),
+            #    Input('area_under_radius', 'clickData'),
+            #    Input('area_under_radius', 'hoverData'),
+            #    Input('area_under_radius', 'relayoutData'),],
+            #   [State("store_area", "data"),
+            #    State('area_under_radius', 'figure'),],
+            ##  prevent_initial_call=True,
+            #  )
+# def update_graphs_area(hdf5_experimentation_data, triggers_data,
+                #   clickData, hoverData, relayoutData, store_data, figure):
+    # if hdf5_experimentation_data:
+        # df_list = hdf5_experimentation_data 
+        # if df_list:
+            # num_group_subplots = len(df_list)
+            # triggers_data = triggers_data[0]
+            # extracted_df = utils.extract_data(df_list, triggers_data)
+            # file_names = ["Test run " + name[:-4] for name, _ in extracted_df.items()]
+            # fig_area_all = make_subplots(rows=num_group_subplots, cols=1, 
+                                    # subplot_titles=tuple(file_names), # tuple([" "]*num_group_subplots)
+                                    # vertical_spacing=0.045,
+                                    # )
+            # fig_area_all.update_layout(title_text="<b>Area under the radius curve for all runs in the group<b>",
+                    # title_x=0.5,
+                    # dragmode=False,
+                    # height=900*num_group_subplots/3.,
+                    ##autosize=True,
+                    # showlegend=True,
+                    # legend_tracegroupgap = 80*num_group_subplots/4.07,
+                # )
+            # fig_area_all = utils.get_fig_area(extracted_df, fig_area_all) 
+            # return fig_area_all, store_data  
+        # else:
+            # return px.scatter(), None
+    # else:
+        # raise dash.exceptions.PreventUpdate
+@app.callback(
+    [Output('area_under_radius', 'figure'),
+     Output('mov_avg_radius', 'figure'),
+     Output('shared_triggers', 'data')],
+    [Input('hdf5-data-tabs', 'children'),
+     Input('triggers-data', 'data'),
+     Input('area_under_radius', 'relayoutData'),
+     Input('mov_avg_radius', 'relayoutData'),
+     Input('area_under_radius', 'clickData'),
+     Input('area_under_radius', 'hoverData'),
+     Input('mov_avg_radius', 'clickData'),
+     Input('mov_avg_radius', 'hoverData')],
+    [State('shared_triggers', 'data'),
+     State('area_under_radius', 'figure'),
+     State('mov_avg_radius', 'figure')]
+)
+def update_figures(hdf5_experimentation_data, triggers_data, 
+                  area_relayout, avg_relayout,
+                  area_click, area_hover,
+                  avg_click, avg_hover,
+                  shared_triggers, area_fig, avg_fig):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        raise dash.exceptions.PreventUpdate
 
-            fig_mov_avg_all = make_subplots(rows=num_group_subplots, cols=1, 
-                                    subplot_titles=tuple(file_names), 
-                                    vertical_spacing=0.045,
-                                    )
-            fig_mov_avg_all.update_layout(title_text="<b>Moving average for all runs in the group<b>",
-                    title_x=0.5,
-                    dragmode=False,
-                    height=900*num_group_subplots/3.,
-                    showlegend=True,
-                    legend_tracegroupgap = 80*num_group_subplots/3.25,
-            )
-            fig_mov_avg_all = utils.get_fig_avg(extracted_df, fig_mov_avg_all)
-            return fig_mov_avg_all, store_data
-        
-        elif figure != None: 
-            fig_mov_avg_all = go.Figure(figure)
-            vertical_threshold = 100
-            if clickData:
-                point = clickData["points"][0]
-                x = point["x"]
-                # Sensitivity for detecting line clicks
-                if abs(x - store_data["x_start_trigger"]) < vertical_threshold:
-                    store_data["dragging"] = "start_trigger"  # Start dragging vertical line
-                elif abs(x - store_data["x_stop_trigger"]) < vertical_threshold:
-                    store_data["dragging"] = "stop_trigger"  # Start dragging vertical line
-            if hoverData and store_data["dragging"]:
-                point = hoverData["points"][0]
-                x = point["x"]
-                print('X Position:', x)
-                # Print when hovering over lines
-                if abs(x - store_data["x_start_trigger"]) < vertical_threshold:
-                    print(f"{x}: start trigger")
-                if abs(x - store_data["x_stop_trigger"]) < vertical_threshold:
-                    print(f"{x}: stop trigger")
-                shapes = fig_mov_avg_all["layout"]["shapes"]
-                
-                # Smoothly move the vertical line
-                if store_data["dragging"] == "start_trigger":
-                    shapes[0]["x0"] = shapes[0]["x1"] = x  # Move vertical line
-                    store_data["x_start_trigger"] = x  # Update the x-coordinate of the line
-                elif store_data["dragging"] == "stop_trigger":
-                    shapes[1]["x0"] = shapes[1]["x1"] = x  # Move vertical line 2
-                    store_data["x_stop_trigger"] = x  
-                fig_mov_avg_all["layout"]["shapes"] = shapes  # Apply changes to the figure
+    trigger_id = ctx.triggered[0]['prop_id'].split('.')
+    print('INICIO')
+    # Handle initial load or data updates
+    if trigger_id[0] in ['hdf5-data-tabs', 'triggers-data']:
+        if not hdf5_experimentation_data:
+            raise dash.exceptions.PreventUpdate
             
-            if relayoutData:
-                store_data["dragging"] = None  # Stop dragging when the mouse is released
-            return fig_mov_avg_all, store_data  #fig_scatter (as first argument) fig_qq_plot(as last argument)
-        else:
-            return px.scatter(), None
-    else:
-        raise dash.exceptions.PreventUpdate
+        df_list = hdf5_experimentation_data
+        if not df_list:
+            return px.scatter(), px.scatter(), shared_triggers
+
+        num_group_subplots = len(df_list)
+        triggers_data = triggers_data[0]
+        extracted_df = utils.extract_data(df_list, triggers_data)
+        file_names = ["Test run " + name[:-4] for name, _ in extracted_df.items()]
+
+        # Create figures
+        fig_area_all = make_subplots(
+            rows=num_group_subplots, cols=1, 
+            subplot_titles=tuple(file_names),
+            vertical_spacing=0.045,
+        )
+        fig_area_all.update_layout(
+            title_text="<b>Area under the radius curve for all runs in the group<b>",
+            title_x=0.5,
+            dragmode=False,
+            height=300*num_group_subplots,
+            showlegend=True,
+            legend_tracegroupgap=80*num_group_subplots/4.07,
+        )
+
+        fig_mov_avg_all = make_subplots(
+            rows=num_group_subplots, cols=1, 
+            subplot_titles=tuple(file_names),
+            vertical_spacing=0.045,
+        )
+        fig_mov_avg_all.update_layout(
+            title_text="<b>Moving average for all runs in the group<b>",
+            title_x=0.5,
+            dragmode=False,
+            height=300*num_group_subplots,
+            showlegend=True,
+            legend_tracegroupgap=80*num_group_subplots/3.25,
+        )
+
+        # Generate figures with shared triggers
+        fig_area_all = utils.get_fig_area(extracted_df, fig_area_all, shared_triggers)
+        fig_mov_avg_all = utils.get_fig_avg(extracted_df, fig_mov_avg_all, shared_triggers)
+        return fig_area_all, fig_mov_avg_all, shared_triggers
     
-@app.callback([Output('area_under_radius', 'figure'),
-               Output("store_area", "data"),],
-              [Input('hdf5-data-tabs', 'children'),
-               Input('triggers-data', 'data'),
-               Input('area_under_radius', 'clickData'),
-               Input('area_under_radius', 'hoverData'),
-               Input('area_under_radius', 'relayoutData'),],
-              [State("store_area", "data"),
-               State('area_under_radius', 'figure'),],
-            #   prevent_initial_call=True,
-             )
-def update_graphs_area(hdf5_experimentation_data, triggers_data,
-                  clickData, hoverData, relayoutData, store_data, figure):
-    if hdf5_experimentation_data:
-        df_list = hdf5_experimentation_data 
-        if df_list:
-            num_group_subplots = len(df_list)
-            triggers_data = triggers_data[0]
-            extracted_df = utils.extract_data(df_list, triggers_data)
-            file_names = ["Test run " + name[:-4] for name, _ in extracted_df.items()]
-            fig_area_all = make_subplots(rows=num_group_subplots, cols=1, 
-                                    subplot_titles=tuple(file_names), # tuple([" "]*num_group_subplots)
-                                    vertical_spacing=0.045,
-                                    )
-            fig_area_all.update_layout(title_text="<b>Area under the radius curve for all runs in the group<b>",
-                    title_x=0.5,
-                    dragmode=False,
-                    height=900*num_group_subplots/3.,
-                    # autosize=True,
-                    showlegend=True,
-                    legend_tracegroupgap = 80*num_group_subplots/4.07,
-                )
-            fig_area_all = utils.get_fig_area(extracted_df, fig_area_all) 
-            return fig_area_all, store_data  
-        else:
-            return px.scatter(), None
-    else:
-        raise dash.exceptions.PreventUpdate
+    # Handle click events to start dragging
+    elif trigger_id[0] in ['area_under_radius', 'mov_avg_radius'] and 'clickData' in trigger_id[1]:
+        click_data = area_click if trigger_id[0] == 'area_under_radius' else avg_click
+        if not click_data:
+            return area_fig, avg_fig, shared_triggers
+        
+        point = click_data["points"][0]
+        x = point["x"]
+        vertical_threshold = 100  # Sensitivity for detecting line clicks
+
+        # Check which line was clicked and set dragging state
+        for subplot_idx, triggers in shared_triggers['triggers'].items():
+            if abs(x - triggers['start']) < vertical_threshold:
+                shared_triggers['dragging'] = {'subplot': subplot_idx, 'type': 'start'}
+                break
+            elif abs(x - triggers['stop']) < vertical_threshold:
+                shared_triggers['dragging'] = {'subplot': subplot_idx, 'type': 'stop'}
+                break
+        return area_fig, avg_fig, shared_triggers
+
+    # Handle trigger line updates through relayoutData
+    elif trigger_id[0] in ['area_under_radius', 'mov_avg_radius'] and 'relayoutData' in trigger_id[1]:
+        relayout_data = area_relayout if trigger_id[0] == 'area_under_radius' else avg_relayout
+        
+        # Skip if it's just an autosize event
+        if relayout_data and list(relayout_data.keys()) == ['autosize']:
+            return area_fig, avg_fig, shared_triggers
+       
+        # Handle shape movement
+        if relayout_data and any('shapes' in key for key in relayout_data.keys()):
+            for key in relayout_data:
+                if 'shapes' in key and ('x0' in key or 'x1' in key):
+                    # Extract shape index and new position
+                    shape_num = int(key.split('[')[1].split(']')[0])
+                    new_x = relayout_data[key]
+                    subplot_idx = shape_num // 2
+                    is_start = shape_num % 2 == 0
+                    
+                    # Update shared triggers
+                    trigger_type = 'start' if is_start else 'stop'
+                    shared_triggers['triggers'][str(subplot_idx)][trigger_type] = new_x
+                    
+                    # Update both figures
+                    for fig in [area_fig, avg_fig]:
+                        if 'layout' in fig and 'shapes' in fig['layout']:
+                            fig['layout']['shapes'][shape_num].update({
+                                'x0': new_x,
+                                'x1': new_x
+                            })
+            
+            # Clear any dragging state
+            shared_triggers['dragging'] = None
+            return area_fig, avg_fig, shared_triggers
+
+    # Handle hover events for dragging
+    elif trigger_id[0] in ['area_under_radius', 'mov_avg_radius'] and 'hoverData' in trigger_id[1]:
+        hover_data = area_hover if trigger_id[0] == 'area_under_radius' else avg_hover
+        if not hover_data or not shared_triggers['dragging']:
+            return area_fig, avg_fig, shared_triggers
+
+        point = hover_data["points"][0]
+        x = point["x"]
+        print('x: ', x)
+        subplot_idx = int(shared_triggers['dragging']['subplot'])
+        print('subplot_idx: ', subplot_idx)
+        trigger_type = shared_triggers['dragging']['type']
+        # Update trigger position
+        shared_triggers['triggers'][str(subplot_idx)][trigger_type] = x
+
+        # Update shapes in both figures
+        shape_idx = subplot_idx * 2 + (0 if trigger_type == 'start' else 1)
+        for fig in [area_fig, avg_fig]:
+            if 'layout' in fig and 'shapes' in fig['layout']:
+                fig['layout']['shapes'][shape_idx].update({
+                    'x0': x,
+                    'x1': x,
+                    'xref': f'x{subplot_idx + 1}',  # Make sure we're using the correct subplot reference
+                })
+
+        print('update triggers shared: ', shared_triggers)
+        return area_fig, avg_fig, shared_triggers
+    raise dash.exceptions.PreventUpdate
 
 @app.callback([Output('normality-test-table-lilliefors', 'data'),
                Output('normality-test-table-lilliefors', 'columns'),

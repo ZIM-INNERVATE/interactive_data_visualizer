@@ -86,12 +86,18 @@ visualization_layout = html.Div(
                   dcc.Tab(label='Area calculation', value='tab-area',
                       children=[
                           dcc.Graph(id='area_under_radius',
-                                    config={'displayModeBar': True, "scrollZoom": False},
-                                    animate=True),
-                          dcc.Store(id="store_triggers", 
-                                    data={"x_start_trigger": 100, 
-                                          "x_stop_trigger": 9000, 
-                                          "dragging": None}),
+                                    config={'displayModeBar': True, 
+                                            'scrollZoom': False,
+                                            'editable': True, 
+                                            'edits': {
+                                                'shapePosition': True,
+                                                'annotationPosition': True,
+                                            },
+                                            'modeBarButtonsToAdd': ['drawopenpath','eraseshape'],
+                                    },
+                                    animate=True,
+                                    figure={'layout':{'dragmode':'draggable',
+                                                      'hovermode':'closest'}}),
                       ],
                       className='custom-tab',
                       selected_className='custom-tab--selected',
@@ -100,15 +106,18 @@ visualization_layout = html.Div(
                       children=[
                           dcc.Graph(id='mov_avg_radius',
                                     config={'displayModeBar': True, "scrollZoom": False},
-                                    animate=True),
-                          dcc.Store(id="store_triggers", 
-                                    data={"x_start_trigger": 100, 
-                                          "x_stop_trigger": 9000, 
-                                          "dragging": None}),
+                                    animate=True,
+                                    figure={'layout':{'dragmode':'draggable'}}),
                       ],
                       className='custom-tab',
                       selected_className='custom-tab--selected',
                   ),
+                  # Shared store for all triggers
+                  dcc.Store(id="shared_triggers", 
+                           data={
+                               "triggers": {},   
+                               "dragging": None
+                           }),
                   dcc.Tab(label='Extra Tab', value='tab-normality-test',
                       children=[
                           html.Div([

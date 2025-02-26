@@ -203,7 +203,7 @@ def combine_bins(hist, bin_edges, expected_freq=5):
     
     return hist, bin_edges
 
-def get_fig_area(data, fig_area_all):
+def get_fig_area(data, fig_area_all, shared_triggers):
     """
     Create plot fig
     """
@@ -212,6 +212,17 @@ def get_fig_area(data, fig_area_all):
     for name, single_obj in data.items():
         r, r_avg, r_low_lim, r_up_lim, triggers = single_obj.radius_eval()
         
+        if row_num-1 not in shared_triggers['triggers']:
+            shared_triggers['triggers'][row_num-1] = {
+                'start': triggers['Start Trigger'],
+                'stop': triggers['Stop Trigger']
+            }
+        
+        # Get trigger values for this subplot from shared store
+        subplot_triggers = shared_triggers['triggers'][row_num-1]
+        start_trigger = subplot_triggers['start']
+        stop_trigger = subplot_triggers['stop']
+
         # Add horizontal lines with drag capability
         h_lines = [
             (r_low_lim, 'Alarm', 'red', True, 'r_low_lim'),
@@ -245,8 +256,10 @@ def get_fig_area(data, fig_area_all):
 
         # Add vertical lines with drag capability
         v_lines = [
-            (triggers['Start Trigger'], 'Start trigger', 'green', True, 'start_trigger'),
-            (triggers['Stop Trigger'], 'Stop trigger', 'red', True, 'stop_trigger')
+            # (triggers['Start Trigger'], 'Start trigger', 'green', True, 'start_trigger'),
+            # (triggers['Stop Trigger'], 'Stop trigger', 'red', True, 'stop_trigger')
+            (start_trigger, 'Start trigger', 'green', True, 'start_trigger'),
+            (stop_trigger, 'Stop trigger', 'red', True, 'stop_trigger')
         ]
         for x_val, name, color, show_legend, line_id in v_lines:
             trace = go.Scatter(
@@ -271,9 +284,7 @@ def get_fig_area(data, fig_area_all):
                 "line": {"color": color, "width": 3},
             })
 
-        def update_areas(line_positions, r_avg):
-            """Helper function to create area traces with updated positions"""
-            return [
+        area_traces = [
                 (r_avg, None, 'Moving average', 'lightblue', None, True),
                 ([min(max(val, line_positions['r_low_lim']), line_positions['r_up_lim']) for val in r_avg], 
                  'tonexty', 'Outside of limits', 'rgba(0,0,0,0)', 'rgba(255,0,0,0.5)', True),
@@ -286,9 +297,6 @@ def get_fig_area(data, fig_area_all):
                 ([max(min(val, line_positions['target']), line_positions['warning_low']) for val in r_avg], 
                  'tonexty', 'Optimal radius', 'rgba(0,0,0,0)', 'rgba(11, 156, 49, 0.3)', True)
             ]
-
-        # Initial area traces
-        area_traces = update_areas(line_positions, r_avg)
         
         for y, fill, name, line_color, fillcolor, show_legend in area_traces:
             fig_area_all.add_trace(go.Scatter(
@@ -309,8 +317,35 @@ def get_fig_area(data, fig_area_all):
             col=1,
             range=[min(r), max(r)] 
         )
+        # Add vertical lines
+        shapes.extend([
+            {
+                "type": "line",
+                "x0": start_trigger, 
+                "x1": start_trigger, 
+                "y0": min(r), 
+                "y1": max(r),
+                "xref": f"x{row_num}", 
+                "yref": f"y{row_num}",
+                "line": {"color": "green", "width": 3, "dash": "dashdot"},
+                "editable": True,
+                # "draggable": True
+            },
+            {
+                "type": "line",
+                "x0": stop_trigger, 
+                "x1": stop_trigger, 
+                "y0": min(r), 
+                "y1": max(r),
+                "xref": f"x{row_num}", 
+                "yref": f"y{row_num}",
+                "line": {"color": "red", "width": 3, "dash": "dashdot"},
+                "editable": True,
+                # "draggable": True
+            }
+        ])
         row_num += 1
-
+        
     fig_area_all.update_layout(
         dragmode=False,  # Disable zoom & pan
         showlegend=True, 
@@ -320,7 +355,7 @@ def get_fig_area(data, fig_area_all):
     )
     return fig_area_all
 
-def get_fig_avg(data, fig_mov_avg_all):
+def get_fig_avg(data, fig_mov_avg_all, shared_triggers):
     """
     Create plot fig
     """
@@ -329,6 +364,10 @@ def get_fig_avg(data, fig_mov_avg_all):
     for name, single_obj in data.items():
         r, r_avg, r_low_lim, r_up_lim, triggers = single_obj.radius_eval()
         
+        subplot_triggers = shared_triggers['triggers'][row_num-1]
+        start_trigger = subplot_triggers['start']
+        stop_trigger = subplot_triggers['stop']
+
         # Add radius and moving average lines
         traces = [
             (r, 'Radius', 'blue', None),
@@ -375,8 +414,8 @@ def get_fig_avg(data, fig_mov_avg_all):
 
         # Add vertical lines with drag capability
         v_lines = [
-            (triggers['Start Trigger'], 'Start trigger', 'green', True, 'start_trigger'),
-            (triggers['Stop Trigger'], 'Stop trigger', 'red', True, 'stop_trigger')
+            (start_trigger, 'Start trigger', 'green', True, 'start_trigger'),
+            (stop_trigger, 'Stop trigger', 'red', True, 'stop_trigger')
         ]
         for x_val, name, color, show_legend, line_id in v_lines:
             trace = go.Scatter(
