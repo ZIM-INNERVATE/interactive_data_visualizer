@@ -256,32 +256,48 @@ def get_fig_area(data, fig_area_all, shared_triggers):
 
         # Add vertical lines with drag capability
         v_lines = [
-            # (triggers['Start Trigger'], 'Start trigger', 'green', True, 'start_trigger'),
-            # (triggers['Stop Trigger'], 'Stop trigger', 'red', True, 'stop_trigger')
             (start_trigger, 'Start trigger', 'green', True, 'start_trigger'),
             (stop_trigger, 'Stop trigger', 'red', True, 'stop_trigger')
         ]
         for x_val, name, color, show_legend, line_id in v_lines:
-            trace = go.Scatter(
-                x=[None], mode='markers',
-                marker=dict(color=color, size=10),
-                name=name, showlegend=show_legend,
-                legendgroup=row_num,
-                customdata=[line_id],  # Store line identifier
-                hovertemplate=f"{name}: %{{y:.2f}}<extra></extra>",
-            )
-            fig_area_all.add_trace(trace, row=row_num, col=1)
-        
+            # trace = go.Scatter(
+            #     x=[None], mode='markers',
+            #     marker=dict(color=color, size=10),
+            #     name=name, showlegend=show_legend,
+            #     legendgroup=row_num,
+            #     customdata=[line_id],  # Store line identifier
+            #     hovertemplate=f"{name}: %{{y:.2f}}<extra></extra>",
+            # )
+            # fig_area_all.add_trace(trace, row=row_num, col=1)
+            
+            fig_area_all.add_trace(go.Scatter(
+                x=[x_val],
+                y=[40],  # Place in middle of plot
+                mode='markers',
+                marker=dict(
+                    color=color,
+                    size=12,
+                    symbol='circle',
+                ),
+                name=f"{name} handle",
+                showlegend=False,
+                hoverinfo='x',
+                customdata=[[row_num-1, line_id]],  # Store subplot index and line type
+                hovertemplate=f"{name}: %{{x}}<extra></extra>",
+            ), row=row_num, col=1)
+            
+
             # Add shape for vertical line with correct subplot reference
             shapes.append({
                 "type": "line",
                 "x0": x_val, 
                 "x1": x_val, 
-                "y0": min(r), 
-                "y1": max(r),
+                "y0": 0, #min(r)-1, 
+                "y1": 100, #max(r)+1,
                 "xref": f"x{row_num}", 
                 "yref": f"y{row_num}",
                 "line": {"color": color, "width": 3},
+                "editable": False,
             })
 
         area_traces = [
@@ -317,33 +333,6 @@ def get_fig_area(data, fig_area_all, shared_triggers):
             col=1,
             range=[min(r), max(r)] 
         )
-        # Add vertical lines
-        shapes.extend([
-            {
-                "type": "line",
-                "x0": start_trigger, 
-                "x1": start_trigger, 
-                "y0": min(r), 
-                "y1": max(r),
-                "xref": f"x{row_num}", 
-                "yref": f"y{row_num}",
-                "line": {"color": "green", "width": 3, "dash": "dashdot"},
-                "editable": True,
-                # "draggable": True
-            },
-            {
-                "type": "line",
-                "x0": stop_trigger, 
-                "x1": stop_trigger, 
-                "y0": min(r), 
-                "y1": max(r),
-                "xref": f"x{row_num}", 
-                "yref": f"y{row_num}",
-                "line": {"color": "red", "width": 3, "dash": "dashdot"},
-                "editable": True,
-                # "draggable": True
-            }
-        ])
         row_num += 1
         
     fig_area_all.update_layout(
@@ -433,11 +422,13 @@ def get_fig_avg(data, fig_mov_avg_all, shared_triggers):
                 "type": "line",
                 "x0": x_val, 
                 "x1": x_val, 
-                "y0": min(r) - 1, 
-                "y1": max(r) + 1,
+                "y0": 0, #min(r) - 1, 
+                "y1": 100, #max(r) + 1,
                 "xref": f"x{row_num}", 
                 "yref": f"y{row_num}",
                 "line": {"color": color, "width": 3},
+                # "yaxis": "fixed",  # Fix the y-axis position
+                # "fixedrange": True
             })
             
         fig_mov_avg_all.update_xaxes(
