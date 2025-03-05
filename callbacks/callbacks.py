@@ -123,7 +123,6 @@ def update_figures(hdf5_experimentation_data, triggers_data,
         raise dash.exceptions.PreventUpdate
 
     trigger_id = ctx.triggered[0]['prop_id'].split('.') 
-    print(trigger_id)
     # Handle initial load or data updates
     if trigger_id[0] in ['hdf5-data-tabs', 'triggers-data']:
         if not hdf5_experimentation_data:
@@ -174,121 +173,105 @@ def update_figures(hdf5_experimentation_data, triggers_data,
     
     # Handle click events to start dragging
     elif trigger_id[0] in ['area_under_radius', 'mov_avg_radius'] and 'clickData' in trigger_id[1]:
-        
         click_data = area_click if trigger_id[0] == 'area_under_radius' else avg_click
         if not click_data:
             return area_fig, avg_fig, shared_triggers
-        
+
         point = click_data["points"][0]
-
-    #     x = point["x"]
-    #     vertical_threshold = 100  # Sensitivity for detecting line clicks
-
-    #     # Check which line was clicked and set dragging state
-    #     for subplot_idx, triggers in shared_triggers['triggers'].items():
-    #         if abs(x - triggers['start']) < vertical_threshold:
-    #             shared_triggers['dragging'] = {'subplot': subplot_idx, 'type': 'start'}
-    #             break
-    #         elif abs(x - triggers['stop']) < vertical_threshold:
-    #             shared_triggers['dragging'] = {'subplot': subplot_idx, 'type': 'stop'}
-    #             break
         
-    #     return area_fig, avg_fig, shared_triggers
-
-    # # Handle trigger line updates through relayoutData
-    # elif trigger_id[0] in ['area_under_radius', 'mov_avg_radius'] and 'relayoutData' in trigger_id[1]:
-    #     relayout_data = area_relayout if trigger_id[0] == 'area_under_radius' else avg_relayout
-        
-    #     # Skip if it's just an autosize event
-    #     if relayout_data and list(relayout_data.keys()) == ['autosize']:
-    #         return area_fig, avg_fig, shared_triggers
-    #     # Handle shape movement
-    #     if relayout_data and any('shapes' in key for key in relayout_data.keys()):
-    #         for key in relayout_data:
-    #             if 'shapes' in key and ('x0' in key or 'x1' in key):
-    #                 # Extract shape index and new position
-    #                 shape_num = int(key.split('[')[1].split(']')[0])
-    #                 new_x = relayout_data[key]
-
-    #                 subplot_idx = shape_num // 2
-    #                 is_start = shape_num % 2 == 0
-    #                 print(f"Moving {'start' if is_start else 'stop'} trigger in subplot {subplot_idx + 1} to x={new_x}")
-    #                 # Update shared triggers
-    #                 trigger_type = 'start' if is_start else 'stop'
-    #                 shared_triggers['triggers'][str(subplot_idx)][trigger_type] = new_x
-                    
-    #                 # Update both figures
-    #                 for fig in [area_fig, avg_fig]:
-    #                     if 'layout' in fig and 'shapes' in fig['layout']:
-    #                         fig['layout']['shapes'][shape_num].update({
-    #                             'x0': new_x,
-    #                             'x1': new_x,
-    #                             # Keep original y coordinates
-    #                             'y0': 0,
-    #                             'y1': 80,
-    #                             'xref': f'x{subplot_idx + 1}',  # Ensure correct subplot reference
-    #                             'yref': f'y{subplot_idx + 1}'
-    #                         })
-            
-    #         # Clear any dragging state
-    #         shared_triggers['dragging'] = None
-    #         return area_fig, avg_fig, shared_triggers
-        if 'customdata' in point:
+        # Only start dragging if we clicked a handle
+        if 'customdata' in point and len(point['customdata']) > 0:
             subplot_idx, line_id = point['customdata'][0]
             trigger_type = 'start' if 'start' in line_id else 'stop'
             shared_triggers['dragging'] = {
                 'subplot': subplot_idx,
                 'type': trigger_type,
-                'origin': trigger_id[0]  # Store which plot initiated the drag
+                'origin': trigger_id[0]
             }
             print(f"Started dragging {trigger_type} trigger in subplot {subplot_idx + 1}")
         
         return area_fig, avg_fig, shared_triggers
-    
+
     # Handle hover events for dragging
     elif trigger_id[0] in ['area_under_radius', 'mov_avg_radius'] and 'hoverData' in trigger_id[1]:
         hover_data = area_hover if trigger_id[0] == 'area_under_radius' else avg_hover
+        
+        # Only process hover if we're currently dragging
         if not hover_data or not shared_triggers.get('dragging'):
             return area_fig, avg_fig, shared_triggers
 
         point = hover_data["points"][0]
         x = point["x"]
-        subplot_idx = int(shared_triggers['dragging']['subplot'])
+        subplot_idx = shared_triggers['dragging']['subplot']
         trigger_type = shared_triggers['dragging']['type']
-        
-        # Only update if we're hovering in the correct subplot
-        # hover_subplot = point['curveNumber']#, 0) // 6  # Divide by number of traces per subplot
-        # print('hover_subplot: ', hover_subplot)
-        # print('subplot_idx: ', subplot_idx)
-        # if hover_subplot != subplot_idx:
-            # return area_fig, avg_fig, shared_triggers
 
         # Update trigger position
         shared_triggers['triggers'][str(subplot_idx)][trigger_type] = x
 
-        # Update shapes in both figures
-        # shape_idx = subplot_idx * 2 + (0 if trigger_type == 'start' else 1)
+        # Update both figures
         for fig in [area_fig, avg_fig]:
             if 'layout' in fig and 'shapes' in fig['layout']:
+                # Update vertical line
                 shape_idx = subplot_idx * 2 + (0 if trigger_type == 'start' else 1)
                 fig['layout']['shapes'][shape_idx].update({
                     'x0': x,
                     'x1': x,
-                    # 'y0': 0,
-                    # 'y1': 80,
-                    # 'xref': f'x{subplot_idx + 1}',  # Make sure we're using the correct subplot reference
-                    # 'yref': f'y{subplot_idx + 1}'
+                    'editable': False  # Ensure line remains non-draggable
                 })
+                
+                # Update handle position
+                for trace in fig['data']:
+                    if 'customdata' in trace and len(trace['customdata']) > 0:
+                        trace_subplot, trace_type = trace['customdata'][0]
+                        if trace_subplot == subplot_idx and trigger_type in trace_type:
+                            trace['x'] = [x]
+
         return area_fig, avg_fig, shared_triggers
-    
+
+    # Handle trigger line updates through relayoutData
     elif trigger_id[0] in ['area_under_radius', 'mov_avg_radius'] and 'relayoutData' in trigger_id[1]:
-        if shared_triggers.get('dragging'):
-            # Clear dragging state
-            shared_triggers['dragging'] = None
-            print("Released trigger")
-        return area_fig, avg_fig, shared_triggers
-    
-    raise dash.exceptions.PreventUpdate
+        relayout_data = area_relayout if trigger_id[0] == 'area_under_radius' else avg_relayout
+        
+        # Skip if it's just an autosize event
+        if relayout_data and list(relayout_data.keys()) == ['autosize']:
+            return area_fig, avg_fig, shared_triggers
+
+        # Get the y-coordinate of the click if available
+        y_click = None
+        if 'clickdata' in relayout_data:
+            y_click = relayout_data['clickdata']['points'][0]['y']
+
+        # Handle shape movement
+        if relayout_data and any('shapes' in key for key in relayout_data.keys()):
+            for key in relayout_data:
+                if 'shapes' in key and ('x0' in key or 'x1' in key):
+                    # Check if click was in the draggable zone (38-42)
+                    if y_click is not None and not (38 <= y_click <= 42):
+                        continue  # Skip if click was outside the draggable zone
+                        
+                    # Extract shape index and new position
+                    shape_num = int(key.split('[')[1].split(']')[0])
+                    new_x = relayout_data[key]
+                    subplot_idx = shape_num // 2
+                    is_start = shape_num % 2 == 0
+                    
+                    print(f"Moving {'start' if is_start else 'stop'} trigger in subplot {subplot_idx + 1} to x={new_x}")
+                    
+                    # Update shared triggers
+                    trigger_type = 'start' if is_start else 'stop'
+                    shared_triggers['triggers'][str(subplot_idx)][trigger_type] = new_x
+                    
+                    # Update both figures
+                    for fig in [area_fig, avg_fig]:
+                        if 'layout' in fig and 'shapes' in fig['layout']:
+                            fig['layout']['shapes'][shape_num].update({
+                                'x0': new_x,
+                                'x1': new_x
+                            })
+            
+            return area_fig, avg_fig, shared_triggers
+
+    return area_fig, avg_fig, shared_triggers
 
 @app.callback([Output('normality-test-table-lilliefors', 'data'),
                Output('normality-test-table-lilliefors', 'columns'),

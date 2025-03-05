@@ -203,6 +203,41 @@ def combine_bins(hist, bin_edges, expected_freq=5):
     
     return hist, bin_edges
 
+def add_trigger_lines(fig, row_num, start_trigger, stop_trigger, r):
+    """Helper function to add trigger lines consistently"""
+    shapes = []
+
+    # Add vertical lines with drag capability
+    v_lines = [
+        (start_trigger, 'Start trigger', 'green', True),
+        (stop_trigger, 'Stop trigger', 'red', True)
+    ]
+    for x_val, name, color, show_legend in v_lines:
+        # Add a trace for the legend
+        fig.add_trace(go.Scatter(
+            x=[x_val],
+            y=[40],  # Middle of plot
+            mode='lines',
+            name=name,
+            line=dict(color=color, width=3, dash='dashdot'),
+            showlegend=show_legend,
+            legendgroup=str(row_num),
+        ), row=row_num, col=1)
+
+        # Add the vertical line as a shape
+        shapes.append({
+            "type": "line",
+            "x0": x_val, 
+            "x1": x_val, 
+            "y0": 0, 
+            "y1": 80,
+            "xref": f"x{row_num}", 
+            "yref": f"y{row_num}",
+            "line": {"color": color, "width": 3, "dash": "dashdot"},
+            "editable": True,  # Make line draggable
+        })
+    return shapes
+
 def get_fig_area(data, fig_area_all, shared_triggers):
     """
     Create plot fig
@@ -212,16 +247,17 @@ def get_fig_area(data, fig_area_all, shared_triggers):
     for name, single_obj in data.items():
         r, r_avg, r_low_lim, r_up_lim, triggers = single_obj.radius_eval()
         
+        # Initialize or update shared triggers
         if row_num-1 not in shared_triggers['triggers']:
             shared_triggers['triggers'][row_num-1] = {
                 'start': triggers['Start Trigger'],
                 'stop': triggers['Stop Trigger']
             }
         
-        # Get trigger values for this subplot from shared store
         subplot_triggers = shared_triggers['triggers'][row_num-1]
-        start_trigger = subplot_triggers['start']
-        stop_trigger = subplot_triggers['stop']
+        shapes.extend(add_trigger_lines(fig_area_all, row_num, 
+                                      subplot_triggers['start'], 
+                                      subplot_triggers['stop'], r))
 
         # Add horizontal lines with drag capability
         h_lines = [
@@ -253,52 +289,6 @@ def get_fig_area(data, fig_area_all, shared_triggers):
                 hovertemplate=f"{name}: %{{y:.2f}}<extra></extra>",
             )
             fig_area_all.add_trace(trace, row=row_num, col=1)
-
-        # Add vertical lines with drag capability
-        v_lines = [
-            (start_trigger, 'Start trigger', 'green', True, 'start_trigger'),
-            (stop_trigger, 'Stop trigger', 'red', True, 'stop_trigger')
-        ]
-        for x_val, name, color, show_legend, line_id in v_lines:
-            # trace = go.Scatter(
-            #     x=[None], mode='markers',
-            #     marker=dict(color=color, size=10),
-            #     name=name, showlegend=show_legend,
-            #     legendgroup=row_num,
-            #     customdata=[line_id],  # Store line identifier
-            #     hovertemplate=f"{name}: %{{y:.2f}}<extra></extra>",
-            # )
-            # fig_area_all.add_trace(trace, row=row_num, col=1)
-            
-            fig_area_all.add_trace(go.Scatter(
-                x=[x_val],
-                y=[40],  # Place in middle of plot
-                mode='markers',
-                marker=dict(
-                    color=color,
-                    size=12,
-                    symbol='circle',
-                ),
-                name=f"{name} handle",
-                showlegend=False,
-                hoverinfo='x',
-                customdata=[[row_num-1, line_id]],  # Store subplot index and line type
-                hovertemplate=f"{name}: %{{x}}<extra></extra>",
-            ), row=row_num, col=1)
-            
-
-            # Add shape for vertical line with correct subplot reference
-            shapes.append({
-                "type": "line",
-                "x0": x_val, 
-                "x1": x_val, 
-                "y0": 0, #min(r)-1, 
-                "y1": 100, #max(r)+1,
-                "xref": f"x{row_num}", 
-                "yref": f"y{row_num}",
-                "line": {"color": color, "width": 3},
-                "editable": False,
-            })
 
         area_traces = [
                 (r_avg, None, 'Moving average', 'lightblue', None, True),
@@ -353,9 +343,17 @@ def get_fig_avg(data, fig_mov_avg_all, shared_triggers):
     for name, single_obj in data.items():
         r, r_avg, r_low_lim, r_up_lim, triggers = single_obj.radius_eval()
         
+        # Initialize or update shared triggers
+        if row_num-1 not in shared_triggers['triggers']:
+            shared_triggers['triggers'][row_num-1] = {
+                'start': triggers['Start Trigger'],
+                'stop': triggers['Stop Trigger']
+            }
+        
         subplot_triggers = shared_triggers['triggers'][row_num-1]
-        start_trigger = subplot_triggers['start']
-        stop_trigger = subplot_triggers['stop']
+        shapes.extend(add_trigger_lines(fig_mov_avg_all, row_num, 
+                                      subplot_triggers['start'], 
+                                      subplot_triggers['stop'], r))
 
         # Add radius and moving average lines
         traces = [
@@ -401,36 +399,6 @@ def get_fig_avg(data, fig_mov_avg_all, shared_triggers):
             )
             fig_mov_avg_all.add_trace(trace, row=row_num, col=1)
 
-        # Add vertical lines with drag capability
-        v_lines = [
-            (start_trigger, 'Start trigger', 'green', True, 'start_trigger'),
-            (stop_trigger, 'Stop trigger', 'red', True, 'stop_trigger')
-        ]
-        for x_val, name, color, show_legend, line_id in v_lines:
-            trace = go.Scatter(
-                x=[None], mode='markers',
-                marker=dict(color=color, size=10),
-                name=name, showlegend=show_legend,
-                legendgroup=row_num,
-                customdata=[line_id],  # Store line identifier
-                hovertemplate=f"{name}: %{{y:.2f}}<extra></extra>",
-            )
-            fig_mov_avg_all.add_trace(trace, row=row_num, col=1)
-            
-            # Add shape for vertical line with correct subplot reference
-            shapes.append({
-                "type": "line",
-                "x0": x_val, 
-                "x1": x_val, 
-                "y0": 0, #min(r) - 1, 
-                "y1": 100, #max(r) + 1,
-                "xref": f"x{row_num}", 
-                "yref": f"y{row_num}",
-                "line": {"color": color, "width": 3},
-                # "yaxis": "fixed",  # Fix the y-axis position
-                # "fixedrange": True
-            })
-            
         fig_mov_avg_all.update_xaxes(
             title_text="Samples", 
             row=row_num, 

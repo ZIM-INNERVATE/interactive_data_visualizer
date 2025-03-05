@@ -1,6 +1,22 @@
 import dash_bootstrap_components as dbc
 from dash import dash_table, dcc, html
 
+def create_graph_config():
+    return {
+        'displayModeBar': True,
+        'scrollZoom': False,
+        'editable': True,
+        'edits': {
+            'shapePosition': True,  # Enable shape dragging
+        },
+    }
+
+def create_graph_layout():
+    return {
+        'dragmode': 'draggable',
+        'hovermode': 'closest'
+    }
+
 visualization_layout = html.Div(
         className='nine columns div-for-charts bg-white',
         children=[
@@ -86,18 +102,9 @@ visualization_layout = html.Div(
                   dcc.Tab(label='Area calculation', value='tab-area',
                       children=[
                           dcc.Graph(id='area_under_radius',
-                                    config={'displayModeBar': True, 
-                                            'scrollZoom': False,
-                                            'editable': True, 
-                                            'edits': {
-                                                'shapePosition': False,
-                                                # 'annotationPosition': True,
-                                            },
-                                            'modeBarButtonsToAdd': ['drawopenpath','eraseshape'],
-                                    },
-                                    animate=True,
-                                    figure={'layout':{'dragmode':'pan',
-                                                      'hovermode':'closest'}},
+                                    config=create_graph_config(),
+                                    animate=False,
+                                    figure={'layout': create_graph_layout()},
                                     style={'height': '2400px'}),
                       ],
                       className='custom-tab',
@@ -106,19 +113,10 @@ visualization_layout = html.Div(
                   dcc.Tab(label='Moving Average for Radius', value='tab-avg-radius',
                       children=[
                           dcc.Graph(id='mov_avg_radius',
-                                    config={'displayModeBar': True, 
-                                            'scrollZoom': False,
-                                            'editable': True, 
-                                            'edits': {
-                                                'shapePosition': True,
-                                                'annotationPosition': True,
-                                            },
-                                            'modeBarButtonsToAdd': ['drawopenpath','eraseshape'],
-                                    },
-                                    animate=True,
-                                    figure={'layout':{'dragmode':'draggable',
-                                                      'hovermode':'closest'}},
-                                    style={'height': f'2400px'}),
+                                    config=create_graph_config(),
+                                    animate=False,
+                                    figure={'layout': create_graph_layout()},
+                                    style={'height': '2400px'}),
                       ],
                       className='custom-tab',
                       selected_className='custom-tab--selected',
