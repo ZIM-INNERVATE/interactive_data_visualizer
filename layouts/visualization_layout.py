@@ -20,6 +20,19 @@ def create_graph_layout():
 visualization_layout = html.Div(
         className='nine columns div-for-charts bg-white',
         children=[
+            # Shared store for all triggers and lines
+            dcc.Store(id='shared_triggers',
+                      storage_type='session',
+                      data={
+                           "triggers": {},   # For vertical lines
+                           "dragging": None
+                      }),
+            dcc.Store(id='shared_limits',
+                      storage_type='session',
+                      data={
+                           "limits": {},   
+                           "dragging": None
+                      }),
             dcc.Tabs(
               id="tabs-for-plots",
               value="tab-data",
@@ -105,7 +118,8 @@ visualization_layout = html.Div(
                                     config=create_graph_config(),
                                     animate=False,
                                     figure={'layout': create_graph_layout()},
-                                    style={'height': '2400px'}),
+                                    # style={'height': '2400px'}
+                                    ),
                       ],
                       className='custom-tab',
                       selected_className='custom-tab--selected',
@@ -116,105 +130,63 @@ visualization_layout = html.Div(
                                     config=create_graph_config(),
                                     animate=False,
                                     figure={'layout': create_graph_layout()},
-                                    style={'height': '2400px'}),
+                                    # style={'height': '2400px'}
+                                    ),
                       ],
                       className='custom-tab',
                       selected_className='custom-tab--selected',
                   ),
-                  # Shared store for all triggers
-                  dcc.Store(id="shared_triggers", 
-                           data={
-                               "triggers": {},   
-                               "dragging": None
-                           }),
-                  dcc.Tab(label='Extra Tab', value='tab-normality-test',
-                      children=[
-                          html.Div([
-                              html.Label("Normality test results with lilliefors", 
-                                      style = {'color': 'black',
-                                              'textAlign': 'center',
-                                              'fontWeight': 'bold'},
-                                    ),
-                              dash_table.DataTable(
-                                  id="normality-test-table-lilliefors",
-                                  style_data={'color': 'black'},
-                                  style_cell={'textAlign': 'center'},
-                                  style_data_conditional=[
-                                      {
-                                          'if': {'row_index': 'odd'},
-                                          'backgroundColor': 'rgb(220, 220, 220)',
-                                      }
-                                  ],
-                                  style_header={
-                                      'backgroundColor': 'rgb(210, 210, 210)',
-                                      'color': 'black',
-                                      'fontWeight': 'bold',
-                                      'textAlign': 'center'
-                                  }
-                              ),
-                          ], style={'display': 'inline-block', 'padding': '10px 10px 10px 10px'}
-                          ),
-                          html.Div([
-                              html.Label("Normality test results with Shapiro-Wilk", 
-                                      style = {'color': 'black',
-                                              'textAlign': 'center',
-                                              'fontWeight': 'bold'},
-                                    ),
-                              dash_table.DataTable(
-                                  id="normality-test-table-shapiro",
-                                  style_data={'color': 'black'},
-                                  style_cell={'textAlign': 'center'},
-                                  style_data_conditional=[
-                                      {
-                                          'if': {'row_index': 'odd'},
-                                          'backgroundColor': 'rgb(220, 220, 220)',
-                                      }
-                                  ],
-                                  style_header={
-                                      'backgroundColor': 'rgb(210, 210, 210)',
-                                      'color': 'black',
-                                      'fontWeight': 'bold',
-                                      'textAlign': 'center'
-                                  }
-                              ),
-                          ],
-                          style={'display': 'inline-block', 'padding': '10px 10px 10px 10px'}
-                          ),
-                          html.Div([
-                              html.Label("Normality test results with chi-square", 
-                                      style = {'color': 'black',
-                                              'textAlign': 'center',
-                                              'fontWeight': 'bold'},
-                                    ),
-                              dash_table.DataTable(
-                                  id="normality-test-table-chi2",
-                                  style_data={'color': 'black'},
-                                  style_cell={'textAlign': 'center'},
-                                  style_data_conditional=[
-                                      {
-                                          'if': {'row_index': 'odd'},
-                                          'backgroundColor': 'rgb(220, 220, 220)',
-                                      }
-                                  ],
-                                  style_header={
-                                      'backgroundColor': 'rgb(210, 210, 210)',
-                                      'color': 'black',
-                                      'fontWeight': 'bold',
-                                      'textAlign': 'center'
-                                  }
-                              ),
-                          ],
-                          style={'display': 'inline-block', 'padding': '10px 10px 10px 10px'}
-                          ),
-                          dcc.Graph(id='normality-test-fig',
-                                    config={'displayModeBar': True},
-                                    animate=True),
-                      ],
+                  dcc.Tab(label='Extra Tab',
+                      children=[],
                       className='custom-tab',
                       selected_className='custom-tab--selected',
                   ),
               ],
               style={'color': '#ffffff'}
             ),
+            # Add modal for function editing
+            dbc.Modal([
+                dbc.ModalHeader("Edit Line Functions"),
+                dbc.ModalBody([
+                    dbc.Form([
+                        dbc.Row([
+                            dbc.Label("Select Subplot:"),
+                            dcc.Dropdown(
+                                id='subplot-selector',
+                                placeholder="Select subplot to edit",
+                                className="mb-3"
+                            ),
+                        ]),
+                        dbc.Row([
+                            dbc.Label("Select Line:"),
+                            dcc.Dropdown(
+                                id='line-selector',
+                                options=[
+                                    {'label': 'Target Line', 'value': 'target'},
+                                    {'label': 'Warning High', 'value': 'warning_high'},
+                                    {'label': 'Warning Low', 'value': 'warning_low'},
+                                    {'label': 'Alarm High', 'value': 'alarm_high'},
+                                    {'label': 'Alarm Low', 'value': 'alarm_low'}
+                                ],
+                                placeholder="Select line to edit",
+                                className="mb-3"
+                            ),
+                        ]),
+                        dbc.Row([
+                            dbc.Label("Function:"),
+                            dbc.Input(
+                                id="function-input",
+                                placeholder="Enter function (e.g., y = 41 or y = 0.001*x + 40)",
+                                type="text",
+                                className="mb-3"
+                            ),
+                        ]),
+                    ]),
+                ]),
+                dbc.ModalFooter([
+                    dbc.Button("Apply", id="apply-function", color="primary"),
+                    dbc.Button("Close", id="close-modal", className="ml-2"),
+                ]),
+            ], id="function-modal"),
         ]
 )

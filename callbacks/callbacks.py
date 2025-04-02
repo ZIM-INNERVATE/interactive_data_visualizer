@@ -1,13 +1,9 @@
 import os
 
 import dash
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import utils.utils as utils
-import copy
+
 from app import app
 from dash.dependencies import Input, Output, State
 from plotly.subplots import make_subplots
@@ -100,28 +96,26 @@ def update_weight_checklist(checklist_weights_all_val,
 @app.callback(
     [Output('area_under_radius', 'figure'),
      Output('mov_avg_radius', 'figure'),
-     Output('shared_triggers', 'data')],
+     Output('shared_triggers', 'data'), 
+     Output('shared_limits', 'data')],
     [Input('hdf5-data-tabs', 'children'),
      Input('triggers-data', 'data'),
      Input('area_under_radius', 'relayoutData'),
      Input('mov_avg_radius', 'relayoutData'),
-     Input('area_under_radius', 'clickData'),
-     Input('area_under_radius', 'hoverData'),
-     Input('mov_avg_radius', 'clickData'),
-     Input('mov_avg_radius', 'hoverData')],
-    [State('shared_triggers', 'data'),
+     State('shared_triggers', 'data'),
+     State('shared_limits', 'data'),
      State('area_under_radius', 'figure'),
-     State('mov_avg_radius', 'figure')]
-)
-def update_figures(hdf5_experimentation_data, triggers_data, 
-                  area_relayout, avg_relayout,
-                  area_click, area_hover,
-                  avg_click, avg_hover,
-                  shared_triggers, area_fig, avg_fig):
+     State('mov_avg_radius', 'figure')],
+    prevent_initial_call=True)
+
+def update_figures(hdf5_experimentation_data, triggers_data,
+                   area_relayout, avg_relayout,
+                   shared_triggers, shared_limits, area_fig, avg_fig):
     ctx = dash.callback_context
+
     if not ctx.triggered:
         raise dash.exceptions.PreventUpdate
-
+   
     trigger_id = ctx.triggered[0]['prop_id'].split('.') 
     # Handle initial load or data updates
     if trigger_id[0] in ['hdf5-data-tabs', 'triggers-data']:
@@ -130,213 +124,90 @@ def update_figures(hdf5_experimentation_data, triggers_data,
             
         df_list = hdf5_experimentation_data
         if not df_list:
-            return px.scatter(), px.scatter(), shared_triggers
+            return px.scatter(), px.scatter(), shared_triggers, shared_limits
 
         num_group_subplots = len(df_list)
         triggers_data = triggers_data[0]
-        extracted_df = utils.extract_data(df_list, triggers_data)
+        limits_data = {
+            'alarm_high': 44,
+            'alarm_low': 36,
+            'warning_low': 38,
+            'target': 40,
+            'warning_high': 42,
+            'goal_t': 180,
+            'freq': 100
+        }
+        extracted_df = utils.extract_data(df_list, triggers_data, limits_data)
         file_names = ["Test run " + name[:-4] for name, _ in extracted_df.items()]
 
-        # Create figures
-        fig_area_all = make_subplots(
-            rows=num_group_subplots, cols=1, 
-            subplot_titles=tuple(file_names),
-            vertical_spacing=0.045,
-        )
-        fig_area_all.update_layout(
-            title_text="<b>Area under the radius curve for all runs in the group<b>",
-            title_x=0.5,
-            dragmode=False,
-            height=300*num_group_subplots,
-            showlegend=True,
-            legend_tracegroupgap=2400./num_group_subplots - 180.,
-        )
-
-        fig_mov_avg_all = make_subplots(
-            rows=num_group_subplots, cols=1, 
-            subplot_titles=tuple(file_names),
-            vertical_spacing=0.045,
-        )
-        fig_mov_avg_all.update_layout(
-            title_text="<b>Moving average for all runs in the group<b>",
-            title_x=0.5,
-            dragmode=False,
-            height=300*num_group_subplots,
-            showlegend=True,
-            legend_tracegroupgap=2400./num_group_subplots - 139.,
-        )
-
+        fig_area_all, fig_mov_avg_all = utils.create_graph_config(num_group_subplots, file_names)
         # Generate figures with shared triggers
-        fig_area_all = utils.get_fig_area(extracted_df, fig_area_all, shared_triggers)
-        fig_mov_avg_all = utils.get_fig_avg(extracted_df, fig_mov_avg_all, shared_triggers)
-        return fig_area_all, fig_mov_avg_all, shared_triggers
+        fig_area_all = utils.get_fig_area(extracted_df, fig_area_all, shared_triggers, shared_limits)
+        fig_mov_avg_all = utils.get_fig_avg(extracted_df, fig_mov_avg_all, shared_triggers, shared_limits)
+        return fig_area_all, fig_mov_avg_all, shared_triggers, shared_limits
     
-    # Handle click events to start dragging
-    elif trigger_id[0] in ['area_under_radius', 'mov_avg_radius'] and 'clickData' in trigger_id[1]:
-        click_data = area_click if trigger_id[0] == 'area_under_radius' else avg_click
-        if not click_data:
-            return area_fig, avg_fig, shared_triggers
-
-        point = click_data["points"][0]
-        
-        # Only start dragging if we clicked a handle
-        if 'customdata' in point and len(point['customdata']) > 0:
-            subplot_idx, line_id = point['customdata'][0]
-            trigger_type = 'start' if 'start' in line_id else 'stop'
-            shared_triggers['dragging'] = {
-                'subplot': subplot_idx,
-                'type': trigger_type,
-                'origin': trigger_id[0]
-            }
-            print(f"Started dragging {trigger_type} trigger in subplot {subplot_idx + 1}")
-        
-        return area_fig, avg_fig, shared_triggers
-
-    # Handle hover events for dragging
-    elif trigger_id[0] in ['area_under_radius', 'mov_avg_radius'] and 'hoverData' in trigger_id[1]:
-        hover_data = area_hover if trigger_id[0] == 'area_under_radius' else avg_hover
-        
-        # Only process hover if we're currently dragging
-        if not hover_data or not shared_triggers.get('dragging'):
-            return area_fig, avg_fig, shared_triggers
-
-        point = hover_data["points"][0]
-        x = point["x"]
-        subplot_idx = shared_triggers['dragging']['subplot']
-        trigger_type = shared_triggers['dragging']['type']
-
-        # Update trigger position
-        shared_triggers['triggers'][str(subplot_idx)][trigger_type] = x
-
-        # Update both figures
-        for fig in [area_fig, avg_fig]:
-            if 'layout' in fig and 'shapes' in fig['layout']:
-                # Update vertical line
-                shape_idx = subplot_idx * 2 + (0 if trigger_type == 'start' else 1)
-                fig['layout']['shapes'][shape_idx].update({
-                    'x0': x,
-                    'x1': x,
-                    'editable': False  # Ensure line remains non-draggable
-                })
-                
-                # Update handle position
-                for trace in fig['data']:
-                    if 'customdata' in trace and len(trace['customdata']) > 0:
-                        trace_subplot, trace_type = trace['customdata'][0]
-                        if trace_subplot == subplot_idx and trigger_type in trace_type:
-                            trace['x'] = [x]
-
-        return area_fig, avg_fig, shared_triggers
-
-    # Handle trigger line updates through relayoutData
+    # Handle shape updates through relayoutData
     elif trigger_id[0] in ['area_under_radius', 'mov_avg_radius'] and 'relayoutData' in trigger_id[1]:
         relayout_data = area_relayout if trigger_id[0] == 'area_under_radius' else avg_relayout
         
-        # Skip if it's just an autosize event
         if relayout_data and list(relayout_data.keys()) == ['autosize']:
-            return area_fig, avg_fig, shared_triggers
-
-        # Get the y-coordinate of the click if available
-        y_click = None
-        if 'clickdata' in relayout_data:
-            y_click = relayout_data['clickdata']['points'][0]['y']
+            return area_fig, avg_fig, shared_triggers, shared_limits
 
         # Handle shape movement
         if relayout_data and any('shapes' in key for key in relayout_data.keys()):
-            for key in relayout_data:
-                if 'shapes' in key and ('x0' in key or 'x1' in key):
-                    # Check if click was in the draggable zone (38-42)
-                    if y_click is not None and not (38 <= y_click <= 42):
-                        continue  # Skip if click was outside the draggable zone
-                        
-                    # Extract shape index and new position
-                    shape_num = int(key.split('[')[1].split(']')[0])
-                    new_x = relayout_data[key]
-                    subplot_idx = shape_num // 2
-                    is_start = shape_num % 2 == 0
-                    
-                    print(f"Moving {'start' if is_start else 'stop'} trigger in subplot {subplot_idx + 1} to x={new_x}")
-                    
-                    # Update shared triggers
-                    trigger_type = 'start' if is_start else 'stop'
-                    shared_triggers['triggers'][str(subplot_idx)][trigger_type] = new_x
-                    
-                    # Update both figures
-                    for fig in [area_fig, avg_fig]:
-                        if 'layout' in fig and 'shapes' in fig['layout']:
-                            fig['layout']['shapes'][shape_num].update({
-                                'x0': new_x,
-                                'x1': new_x
-                            })
+            modified_shapes = {}  # Track which shapes are modified
             
-            return area_fig, avg_fig, shared_triggers
-
-    return area_fig, avg_fig, shared_triggers
-
-@app.callback([Output('normality-test-table-lilliefors', 'data'),
-               Output('normality-test-table-lilliefors', 'columns'),
-               Output('normality-test-table-shapiro', 'data'),
-               Output('normality-test-table-shapiro', 'columns'),
-               Output('normality-test-table-chi2', 'data'),
-               Output('normality-test-table-chi2', 'columns')],
-              [Input('hdf5-data-tabs', 'children'),
-               Input('triggers-data', 'data'),
-               Input('fake', 'data')],
-              prevent_initial_call=True,
-             )
-def update_normality_table(hdf5_experimentation_data, triggers, fake):
-    if hdf5_experimentation_data:
-        significance = 0.05
-        # df = pd.DataFrame.from_records(hdf5_experimentation_data)
-        df = hdf5_experimentation_data
-        if df:
-            extracted_df = utils.extract_data(df, triggers) #utils.exctract_data(df)
-            # test_result_all_lilliefors = []
-            # test_result_all_shapiro = []
-            # test_result_all_chi2 = []
-            # test_result_all_header = []
-            # for i,motion in enumerate(extracted_df):
-                # for j,group in enumerate(extracted_df[motion]):
-                    # if group == "all":
-                        # for k,dist in enumerate(["px", "py", "theta"]):
-                            # dist_data = extracted_df[motion]["all"][dist]
-                            # dist_data = np.asarray(dist_data)
-                            # 
-                            # l_ksstat, l_pval = utils.compute_lilliefors(dist_data)
-                            # s_stat, s_pval = utils.compute_shapiro(dist_data)
-                            # chi2_pval = utils.compute_chi2(dist_data, significance)
-# 
-                            # test_result_all_lilliefors.append({"Motion": f"{motion}-{dist}",
-                                                    # "Group": group,
-                                                    # "Significnce": significance,
-                                                    # "Stat": round(l_ksstat,4),
-                                                    # "P Value": round(l_pval, 4),
-                                                    # "Reject H0": "Yes" if l_pval < significance else "No",
-                                                    # })
-# 
-                            # test_result_all_shapiro.append({"Motion": f"{motion}-{dist}",
-                                                    # "Group": group,
-                                                    # "Significnce": significance,
-                                                    # "Stat": round(s_stat,4),
-                                                    # "P Value": round(s_pval, 4),
-                                                    # "Reject H0": "Yes" if s_pval < significance else "No",
-                                                    # })
-                            # test_result_all_chi2.append({"Motion": f"{motion}-{dist}",
-                                                    # "Group": group,
-                                                    # "Significnce": significance,
-                                                    # "Stat": 0,
-                                                    # "P Value": round(chi2_pval, 4),
-                                                    # "Reject H0": "Yes" if chi2_pval < significance else "No",
-                                                    # })
-# 
-            # test_result_all_header = [{"name": i, "id": i} for i in test_result_all_lilliefors[0].keys()]
-            # return test_result_all_lilliefors, test_result_all_header, \
-                    # test_result_all_shapiro, test_result_all_header, \
-                    # test_result_all_chi2, test_result_all_header
-        else:
-            return None, None, None, None, None, None
-    else:
-        raise dash.exceptions.PreventUpdate
+            # First collect all modifications
+            for key in relayout_data:
+                if 'shapes' in key:
+                    shape_num = int(key.split('[')[1].split(']')[0])
+                    if shape_num not in modified_shapes:
+                        modified_shapes[shape_num] = {}
+                    
+                    if 'x0' in key or 'x1' in key:
+                        new_x = relayout_data[key]
+                        modified_shapes[shape_num]['x'] = new_x
+                    elif 'y0' in key or 'y1' in key:
+                        new_y = relayout_data[key]
+                        modified_shapes[shape_num]['y'] = new_y
+     
+            # Apply all modifications at once
+            for shape_num, changes in modified_shapes.items():
+                subplot_idx = shape_num // 7
+                shape_idx = shape_num - 7 * subplot_idx
+                # Update both figures
+                for fig in [area_fig, avg_fig]:
+                    if 'layout' in fig and 'shapes' in fig['layout']:
+                        # Update shared triggers for vertical lines
+                        if shape_idx < 2:  # First two shapes are vertical lines
+                            fig['layout']['shapes'][shape_num].update({
+                                'x0': changes['x'],
+                                'x1': changes['x'],
+                                'visible': True,
+                                'editable': True
+                            })
+                            trigger_type = 'start' if shape_num % 2 == 0 else 'stop'
+                            shared_triggers['triggers'][str(subplot_idx)][trigger_type] = changes['x']
+                            # Update shared limits for horizontal lines
+                        elif shape_idx >= 2:  # Horizontal lines
+                            fig['layout']['shapes'][shape_num].update({
+                            'y0': changes['y'],
+                            'y1': changes['y'],
+                            'visible': True,
+                            'editable': True
+                            })
+                            limit_types = ['alarm_low', 'alarm_high', 'warning_low', 'target', 'warning_high']
+                            shared_limits['limits'][str(subplot_idx)][limit_types[shape_idx - 2]] = changes['y']
+            
+            new_data = utils.update_subplot(hdf5_experimentation_data, shared_triggers, shared_limits)
+            num_group_subplots = len(new_data)
+            file_names = ["Test run " + name[:-4] for name, _ in new_data.items()]
+            # Update figures with new data
+            fig_area_all, fig_mov_avg_all = utils.create_graph_config(num_group_subplots, file_names)
+            area_fig = utils.get_fig_area(new_data, fig_area_all, shared_triggers, shared_limits)
+            avg_fig = utils.get_fig_avg(new_data, fig_mov_avg_all, shared_triggers, shared_limits)
+            return area_fig, avg_fig, shared_triggers, shared_limits
+    return area_fig, avg_fig, shared_triggers, shared_limits
 
 @app.callback([Output('metadata-data', 'data'),
                Output('metadata-data', 'columns'),
@@ -365,30 +236,14 @@ def update_data_table(selected_file):
 
 @app.callback([Output('dropdown-groups', 'options'),
                Output('dropdown-groups', 'value'),
-            #Output('dropdown-groups', 'options'),
-            #Output('dropdown-groups', 'value'),
-            #Output('checklist-motions', 'options'),
-            #Output('checklist-weights', 'options'),
                ],
               [Input('output-selected-file', 'children'),],
              )
 def initialize_options(selected_file):
     if selected_file:
         df_list = utils.load_dataframe_hdf5(os.path.join(UPLOAD_DIRECTORY, selected_file)) #load_dataframe
-        # checklist_motions = [{"label": col, "value": col} for col in df.motion.unique()]
-    
-        # if "weight" in df:
-            # checklist_weights = [{"label": col, "value": col} for col in df.weight.unique()]
-        # else:
-            # checklist_weights = [{"label": "small (NA)", "value": "small"},
-                                #  {"label": "medium (NA)", "value": "medium"},
-                                #  {"label": "large (NA)", "value": "large"}]
         return df_list,\
                df_list.keys()
-            # df.group.unique(),\
-            #   df.group.unique(),\
-            #   checklist_motions ,\
-            #    checklist_weights
     else:
         raise dash.exceptions.PreventUpdate
 
@@ -484,3 +339,14 @@ def update_data_table_hdf5(selected_file, selected_groups, selected_motions, sel
         updated_tables.append(filtered_df.to_dict('records'))
     
     return updated_tables
+
+@app.callback(
+    Output('hdf5-data-tables-containe   r', 'children'),
+    [Input('output-selected-file', 'children'),
+     Input('dropdown-groups', 'value'),
+     Input('checklist-motions', 'value'),
+     Input('checklist-weights', 'value')],
+    prevent_initial_call=True
+)
+def update_function_config():
+    return None

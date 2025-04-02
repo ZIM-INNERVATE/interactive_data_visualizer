@@ -6,13 +6,8 @@ import matplotlib
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-import scipy.stats as stats
-import statsmodels.api as sm
-import statsmodels.stats.diagnostic as smstatsd
-from scipy.stats import shapiro
 from sklearn.decomposition import PCA
-from statsmodels.graphics.gofplots import qqplot
-from statsmodels.stats.diagnostic import lilliefors
+from plotly.subplots import make_subplots
 
 import h5py
 import importlib
@@ -20,6 +15,37 @@ import utils.SK_evaluation as evlSK
 importlib.reload(evlSK)
 
 matplotlib.use('Agg')
+
+def create_graph_config(num_group_subplots, file_names):
+
+    # Create figures
+    fig_area_all = make_subplots(
+        rows=num_group_subplots, cols=1, 
+        subplot_titles=tuple(file_names),
+        vertical_spacing=0.045,
+    )
+    fig_area_all.update_layout(
+        title_text="<b>Area under the radius curve for all runs in the group<b>",
+        title_x=0.5,
+        dragmode=False,
+        height=300*num_group_subplots,
+        showlegend=True,
+        legend_tracegroupgap=2400./num_group_subplots - 180.,
+    )
+    fig_mov_avg_all = make_subplots(
+        rows=num_group_subplots, cols=1, 
+        subplot_titles=tuple(file_names),
+        vertical_spacing=0.045,
+    )
+    fig_mov_avg_all.update_layout(
+        title_text="<b>Moving average for all runs in the group<b>",
+        title_x=0.5,
+        dragmode=False,
+        height=300*num_group_subplots,
+        showlegend=True,
+        legend_tracegroupgap=2400./num_group_subplots - 139.,
+    )
+    return fig_area_all, fig_mov_avg_all
 
 def save_file(name, content, upload_directory):
     """
@@ -40,25 +66,6 @@ def get_uploaded_files(upload_directory):
         if os.path.isfile(path):
             files.append(filename)
     return files
-
-def load_dataframe(filepath, sep=","):
-    """
-    Read csv file
-    """
-    df = pd.read_csv(filepath,
-                     sep=sep,
-                     dtype="str").reset_index()
-    # convert x, y, and theta to float if separator is ;, the decimal point os ,
-    df['x'] = df['x'].apply(lambda x: float(x.split()[0].replace(',', '.')))
-    df['x'] = df['x'].astype(float)
-
-    df['y'] = df['y'].apply(lambda x: float(x.split()[0].replace(',', '.')))
-    df['y'] = df['y'].astype(float)
-
-    df['theta'] = df['theta'].apply(lambda x: float(x.split()[0].replace(',', '.')))
-    df['theta'] = df['theta'].astype(float)
-
-    return df
 
 def load_dataframe_hdf5(filepath):
     """
@@ -102,7 +109,7 @@ def load_triggers(rawDataDir):
         stop = np.array(triggers_folder["Stop"])
     start = 100
     stop = 9000
-    df = pd.DataFrame(data=np.array([[start, stop]]), columns=['Start Trigger', 'Stop Trigger'])
+    df = pd.DataFrame(data=np.array([[start, stop]]), columns=['start', 'stop'])
     return df
 
 def delete_file(filename, upload_directory):
@@ -124,93 +131,25 @@ def transform_data(data):
 
     return transform_data
 
-def exctract_data(df):
+def extract_data(df_list, triggers, limits):
     """
     Extract dataframe and store them in a dictionary
     """
-    # add the data to a dictionary
-    obs_data = defaultdict(dict)
-    for motion in df.motion.unique():
-        obs_data[motion]["all"] = {}
-        obs_data[motion]["all"]["x"] = []
-        obs_data[motion]["all"]["y"] = []
-        obs_data[motion]["all"]["theta"] = []
-        obs_data[motion]["all"]["px"] = []
-        obs_data[motion]["all"]["py"] = []
-        for group in df.group.unique():
-            obs_data[motion][group] = {}
-            obs_data[motion][group]["x"] = df.loc[df["motion"] == motion].loc[df["group"] == group]["x"]
-            obs_data[motion][group]["y"] = df.loc[df["motion"] == motion].loc[df["group"] == group]["y"]
-            obs_data[motion][group]["theta"] = df.loc[df["motion"] == motion].loc[df["group"] == group]["theta"]
-            
-            transformed_xy = transform_data([obs_data[motion][group]["x"], obs_data[motion][group]["y"]])
-            obs_data[motion][group]["px"] = transformed_xy[:,0]
-            obs_data[motion][group]["py"] = transformed_xy[:,1]
-            obs_data[motion]["all"]["x"].extend(obs_data[motion][group]["x"])
-            obs_data[motion]["all"]["y"].extend(obs_data[motion][group]["y"])
-            obs_data[motion]["all"]["theta"].extend(obs_data[motion][group]["theta"])
-            
-        transformed_all_xy = transform_data([obs_data[motion]["all"]["x"], obs_data[motion]["all"]["y"]])
-        obs_data[motion]["all"]["px"] = transformed_all_xy[:,0]
-        obs_data[motion]["all"]["py"] = transformed_all_xy[:,1]
-            
-    return obs_data
-
-def extract_data(df_list, triggers):
-    """
-    Extract dataframe and store them in a dictionary
-    """
-
     all_data = {}
     for tab in df_list:
         datatable = pd.DataFrame(tab['props']['children'][0]['props']['data'])
         file_name = tab['props']['value']
-        evaluation_list = SK_radius_eval(datatable, triggers)
-        all_data[file_name] = evaluation_list
+        all_data[file_name] = SK_radius_eval(datatable, triggers, limits)
     return all_data
 
-def combine_tails(hist, bin_edges, expected_freq=5, tail=0):
-    """
-    Combine tails if number of bin count is less than expected freq
-    """
-    if hist[tail] < expected_freq:
-        #todo: does not work with [5,1,1,8,11]
-        count = hist.pop(tail)
-        hist[tail] += count
-        
-        # pop the next edge, and keep leftmost/rightmost edge
-        if tail == 0: bin_edges.pop(tail+1)
-        else: bin_edges.pop(tail-1)
-        
-        return combine_tails(hist, bin_edges, expected_freq, tail)
-    else:
-        return hist, bin_edges
-
-def combine_bins(hist, bin_edges, expected_freq=5):
-    """
-    Combine bins in both tails if it's less than expected frequency.
-    For a chi-square test to be valid, the expected frequency should be at least 5 
-    https://www.itl.nist.gov/div898/handbook/eda/section3/eda35f.htm
-    """
-    if len(hist) <= 1:
-        return hist, bin_edges
-    
-    # combine lower tail
-    hist, bin_edges = combine_tails(hist, bin_edges, expected_freq, 0)
-    
-    # combile upper tail
-    hist, bin_edges = combine_tails(hist, bin_edges, expected_freq, -1)
-    
-    return hist, bin_edges
-
-def add_trigger_lines(fig, row_num, start_trigger, stop_trigger, r):
+def add_trigger_lines(fig, row_num, triggers, r):
     """Helper function to add trigger lines consistently"""
     shapes = []
 
     # Add vertical lines with drag capability
     v_lines = [
-        (start_trigger, 'Start trigger', 'green', True),
-        (stop_trigger, 'Stop trigger', 'red', True)
+        (triggers['start'], 'Start trigger', 'green', True),
+        (triggers['stop'], 'Stop trigger', 'red', True)
     ]
     for x_val, name, color, show_legend in v_lines:
         # Add a trace for the legend
@@ -238,69 +177,90 @@ def add_trigger_lines(fig, row_num, start_trigger, stop_trigger, r):
         })
     return shapes
 
-def get_fig_area(data, fig_area_all, shared_triggers):
+def add_limit_functions(fig, row_num, signal_len, subplot_limits):
+    """Helper to change function limits consistently"""
+    shapes = []
+
+    h_lines = [
+        (subplot_limits['alarm_low'], 'Alarm low', 'red', True),
+        (subplot_limits['alarm_high'], 'Alarm high', 'red', False),
+        (subplot_limits['warning_low'], 'Warning low', 'green', True),
+        (subplot_limits['target'], 'Target', 'black', True),
+        (subplot_limits['warning_high'], 'Warning high', 'green', False)
+    ]
+    for y_val, name, color, show_legend in h_lines:
+        # Add a trace for the legend
+        fig.add_trace(go.Scatter(
+            x=[signal_len], #[-5000, signal_len + 5000],
+            y=[y_val], #* signal_len,
+            mode='lines',
+            name=name,
+            line=dict(color=color, width=3, dash='dash'),
+            showlegend=show_legend,
+            legendgroup=str(row_num),
+        ), row=row_num, col=1)
+
+        # Add the vertical line as a shape
+        shapes.append({
+            "type": "line",
+            "x0": -5000, 
+            "x1": signal_len + 5000, 
+            "y0": y_val, 
+            "y1": y_val,
+            "xref": f"x{row_num}", 
+            "yref": f"y{row_num}",
+            "line": {"color": color, "width": 3, "dash": "dash"},
+            "editable": True,  # Make line draggable
+        })
+    return shapes
+
+def get_fig_area(data, fig_area_all, shared_triggers, shared_limits):
     """
     Create plot fig
     """
     shapes = []
     row_num = 1
     for name, single_obj in data.items():
-        r, r_avg, r_low_lim, r_up_lim, triggers = single_obj.radius_eval()
+        r, r_avg, r_low_lim, r_up_lim, triggers, limits = single_obj.radius_eval()
         
         # Initialize or update shared triggers
         if row_num-1 not in shared_triggers['triggers']:
             shared_triggers['triggers'][row_num-1] = {
-                'start': triggers['Start Trigger'],
-                'stop': triggers['Stop Trigger']
+                'start': triggers['start'],
+                'stop': triggers['stop']
+            }
+        # Initialize or update shared limits
+        if row_num-1 not in shared_limits['limits']:
+            shared_limits['limits'][row_num-1] = {
+                'alarm_high': limits['alarm_high'],
+                'alarm_low': limits['alarm_low'], 
+                'warning_high': limits['warning_high'],
+                'warning_low': limits['warning_low'],
+                'target': limits['target'],
+                'freq' : limits['freq'],
+                'goal_t': limits['goal_t']
             }
         
         subplot_triggers = shared_triggers['triggers'][row_num-1]
+        subplot_limits = shared_limits['limits'][row_num-1]
+
         shapes.extend(add_trigger_lines(fig_area_all, row_num, 
-                                      subplot_triggers['start'], 
-                                      subplot_triggers['stop'], r))
-
-        # Add horizontal lines with drag capability
-        h_lines = [
-            (r_low_lim, 'Alarm', 'red', True, 'r_low_lim'),
-            (r_up_lim, 'Alarm', 'red', False, 'r_up_lim'),
-            (39, 'Warning', 'green', True, 'warning_low'),
-            (40, 'Target', 'black', True, 'target'),
-            (41, 'Warning', 'green', False, 'warning_high')
-        ]
-
-        # Store current line positions
-        line_positions = {
-            'r_low_lim': r_low_lim,
-            'r_up_lim': r_up_lim,
-            'warning_low': 39,
-            'target': 40,
-            'warning_high': 41,
-            'start_trigger': triggers['Start Trigger'],
-            'stop_trigger': triggers['Stop Trigger']
-        }
-
-        for y_val, name, color, show_legend, line_id in h_lines:
-            trace = go.Scatter(
-                y=[y_val] * len(r_avg), mode='lines',
-                name=name, showlegend=show_legend,
-                line=dict(color=color, dash='dash'),
-                legendgroup=row_num,
-                customdata=[line_id],  # Store line identifier
-                hovertemplate=f"{name}: %{{y:.2f}}<extra></extra>",
-            )
-            fig_area_all.add_trace(trace, row=row_num, col=1)
+                                      subplot_triggers, r))
+        shapes.extend(add_limit_functions(fig_area_all, 
+                                          row_num, len(r_avg), 
+                                          subplot_limits))
 
         area_traces = [
                 (r_avg, None, 'Moving average', 'lightblue', None, True),
-                ([min(max(val, line_positions['r_low_lim']), line_positions['r_up_lim']) for val in r_avg], 
+                ([min(max(val, limits['alarm_low']), limits['alarm_high']) for val in r_avg], 
                  'tonexty', 'Outside of limits', 'rgba(0,0,0,0)', 'rgba(255,0,0,0.5)', True),
-                ([min(max(val, line_positions['warning_low']), line_positions['r_up_lim']) for val in r_avg], 
+                ([min(max(val, limits['warning_low']), limits['alarm_high']) for val in r_avg], 
                  'tonexty', 'Inside radius range', 'rgba(0,0,0,0)', 'rgba(255,165,0,0.3)', False),
-                ([max(min(val, line_positions['warning_high']), line_positions['r_low_lim']) for val in r_avg], 
+                ([max(min(val, limits['warning_high']), limits['alarm_low']) for val in r_avg], 
                  'tonexty', 'Inside radius range', 'rgba(0,0,0,0)', 'rgba(255,165,0,0.5)', True),
-                ([min(max(val, line_positions['target']), line_positions['warning_high']) for val in r_avg], 
+                ([min(max(val, limits['target']), limits['warning_high']) for val in r_avg], 
                  'tonexty', 'Optimal radius', 'rgba(0,0,0,0)', 'rgba(11, 156, 49,0.1)', False),
-                ([max(min(val, line_positions['target']), line_positions['warning_low']) for val in r_avg], 
+                ([max(min(val, limits['target']), limits['warning_low']) for val in r_avg], 
                  'tonexty', 'Optimal radius', 'rgba(0,0,0,0)', 'rgba(11, 156, 49, 0.3)', True)
             ]
         
@@ -315,7 +275,8 @@ def get_fig_area(data, fig_area_all, shared_triggers):
         fig_area_all.update_xaxes(
             title_text="Samples", 
             row=row_num, 
-            col=1
+            col=1,
+            range=[0, len(r)] 
         )
         fig_area_all.update_yaxes(
             title_text="Radius [m]", 
@@ -334,26 +295,40 @@ def get_fig_area(data, fig_area_all, shared_triggers):
     )
     return fig_area_all
 
-def get_fig_avg(data, fig_mov_avg_all, shared_triggers):
+def get_fig_avg(data, fig_mov_avg_all, shared_triggers, shared_limits):
     """
     Create plot fig
     """
     shapes = []
     row_num = 1
     for name, single_obj in data.items():
-        r, r_avg, r_low_lim, r_up_lim, triggers = single_obj.radius_eval()
+        r, r_avg, r_low_lim, r_up_lim, triggers, limits = single_obj.radius_eval()
         
         # Initialize or update shared triggers
         if row_num-1 not in shared_triggers['triggers']:
             shared_triggers['triggers'][row_num-1] = {
-                'start': triggers['Start Trigger'],
-                'stop': triggers['Stop Trigger']
+                'start': triggers['start'],
+                'stop': triggers['stop']
             }
-        
+            
+        # Initialize or update shared limits
+        if row_num-1 not in shared_limits['limits']:
+            shared_limits['limits'][row_num-1] = {
+                'alarm_high': limits['alarm_high'],
+                'alarm_low': limits['alarm_low'], 
+                'warning_high': limits['warning_high'],
+                'warning_low': limits['warning_low'],
+                'target': limits['target']
+            }
+
         subplot_triggers = shared_triggers['triggers'][row_num-1]
+        subplot_limits = shared_limits['limits'][row_num-1]
+
         shapes.extend(add_trigger_lines(fig_mov_avg_all, row_num, 
-                                      subplot_triggers['start'], 
-                                      subplot_triggers['stop'], r))
+                                      subplot_triggers, r))
+        shapes.extend(add_limit_functions(fig_mov_avg_all, 
+                                          row_num, len(r_avg),
+                                          subplot_limits))
 
         # Add radius and moving average lines
         traces = [
@@ -368,41 +343,11 @@ def get_fig_avg(data, fig_mov_avg_all, shared_triggers):
                 legendgroup=row_num
             ), row=row_num, col=1)
 
-        # Add horizontal lines with drag capability
-        h_lines = [
-            (r_low_lim, 'Alarm', 'red', True, 'r_low_lim'),
-            (r_up_lim, 'Alarm', 'red', False, 'r_up_lim'),
-            (39, 'Warning', 'green', True, 'warning_low'),
-            (40, 'Target', 'black', True, 'target'),
-            (41, 'Warning', 'green', False, 'warning_high')
-        ]
-
-        # Store current line positions
-        line_positions = {
-            'r_low_lim': r_low_lim,
-            'r_up_lim': r_up_lim,
-            'warning_low': 39,
-            'target': 40,
-            'warning_high': 41,
-            'start_trigger': triggers['Start Trigger'],
-            'stop_trigger': triggers['Stop Trigger']
-        }
-
-        for y_val, name, color, show_legend, line_id in h_lines:
-            trace = go.Scatter(
-                y=[y_val] * len(r), mode='lines',
-                name=name, showlegend=show_legend,
-                line=dict(color=color, dash='dash'),
-                legendgroup=row_num,
-                customdata=[line_id],  # Store line identifier
-                hovertemplate=f"{name}: %{{y:.2f}}<extra></extra>",
-            )
-            fig_mov_avg_all.add_trace(trace, row=row_num, col=1)
-
         fig_mov_avg_all.update_xaxes(
             title_text="Samples", 
             row=row_num, 
-            col=1
+            col=1,
+            range=[0, len(r)] 
         )
         fig_mov_avg_all.update_yaxes(
             title_text="Radius [m]", 
@@ -421,63 +366,27 @@ def get_fig_avg(data, fig_mov_avg_all, shared_triggers):
     )
     return fig_mov_avg_all
 
-def compute_lilliefors(data):
+def update_subplot(df_list, triggers, limits):
     """
-    Compute stat and pval with lilliefors
+    Update subplot with trigger lines and limits
     """
-    ksstat, pvalue = lilliefors(data, pvalmethod="table")
+    all_data = {}
+    idx = 0
+    for tab in df_list:
+        datatable = pd.DataFrame(tab['props']['children'][0]['props']['data'])
+        file_name = tab['props']['value']
+        all_data[file_name] = SK_radius_eval(datatable, triggers['triggers'][str(idx)], limits['limits'][str(idx)])
+        idx += 1
+    return all_data
 
-    return ksstat, pvalue
-
-def compute_chi2(data, significance, hist_bins=11, expected_freq=5):
-    """
-    Compute pval with chi-square
-    """
-    hist, bin_edges = np.histogram(data, bins=hist_bins)
-    hist = hist.tolist()
-    bin_edges = bin_edges.tolist()
-    hist, bin_edges  = combine_bins(hist, bin_edges, expected_freq=expected_freq)
-
-    # Calculate Expected value: discrete difference * sum(hist)
-    f_exp = np.diff(stats.norm.cdf(bin_edges, loc=data.mean(), scale=data.std()))*sum(hist)
-    
-    # chi2sum = (B-E)^2/E
-    # B=hist: Observed (Häufigkeiten), f=exp: Expected (Erwartete (angepasste) Häufigkeit)
-    chi2sum = sum((np.array(hist)-f_exp)**2/f_exp)
-    
-    # there was a mistake in PGP sample, x^2 = (B-E)^2/E
-    #chi2sum = sum((f_exp-np.array(hist))**2/f_exp)
-            
-    #how to determine degree of freedom???
-    #dof is determine by the number of histogram - number of parameter being estimated (mean, std)
-    #d=k-1-2 (2 for mean and std)
-    dof = len(hist)-3
-    
-    # 95% quantile
-    quantile_95 = stats.chi2.ppf(1-significance,df=dof)
-        
-    # fixme: sometimes returns nan
-    chi2_result = 1 - stats.chi2.cdf(chi2sum,df=dof)
-
-    return chi2_result
-
-def compute_shapiro(data):
-    """
-    Evaluate data using Shapiro-Wilk test, and determine whether the data was drawn 
-    from Gaussian distribution
-    """
-    shapiro_stat, shapiro_pval = shapiro(data)
-    return shapiro_stat, shapiro_pval
-
-def SK_radius_eval(eval_data, triggers):
-    
-    modul_R_param = evlSK.modul_R(eval_data['Radius'])
+def SK_radius_eval(eval_data, triggers, limits):
+    modul_R_param = evlSK.modul_R(eval_data['Radius'], limits)
     R = modul_R_param.compute_module_R()
-    module_dH_param = evlSK.modul_dH(eval_data['Lenkradwin'])
+    module_dH_param = evlSK.modul_dH(eval_data['Lenkradwin'], limits)
     dH = module_dH_param.compute_module_dH()
-    modul_t_param = evlSK.modul_t(eval_data['Lenkradwin'])
+    modul_t_param = evlSK.modul_t(eval_data['Lenkradwin'], limits)
     t = modul_t_param.compute_module_t()
     evaluation = 0.5 * R + 0.3 * dH + 0.2 * t
 
-    plot_res = evlSK.plotting(modul_R_param, module_dH_param, 1, triggers)
+    plot_res = evlSK.plotting(modul_R_param, module_dH_param, 1, triggers, limits)
     return plot_res
