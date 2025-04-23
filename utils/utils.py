@@ -1,22 +1,39 @@
 import base64
 import os
-from collections import defaultdict
 
 import matplotlib
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from sklearn.decomposition import PCA
+from math import ceil
 from plotly.subplots import make_subplots
+from collections import deque
+from scipy.stats import skew, kurtosis
 
 import h5py
 import importlib
 import utils.SK_evaluation as evlSK
 importlib.reload(evlSK)
-
 matplotlib.use('Agg')
 
-def create_graph_config(num_group_subplots, file_names):
+def create_graph_config():
+    return {
+        'displayModeBar': True,
+        'scrollZoom': False,
+        'editable': True,
+        'edits': {
+        'shapePosition': True,  # Enable shape dragging
+        },
+    }
+
+def create_graph_layout():
+    return {
+        'dragmode': 'draggable',
+        'hovermode': 'closest'
+    }
+
+def create_graph_config_general(num_group_subplots, file_names):
 
     # Create figures
     fig_area_all = make_subplots(
@@ -46,6 +63,25 @@ def create_graph_config(num_group_subplots, file_names):
         legend_tracegroupgap=2400./num_group_subplots - 139.,
     )
     return fig_area_all, fig_mov_avg_all
+
+def create_graph_config_features(num_group_subplots, file_names, num_graphs):
+    # Create figures
+    fig_features_all = {}
+    for i in range(1, num_graphs + 1):
+        fig = make_subplots(
+            rows=ceil(num_group_subplots / 3), cols=3, 
+            subplot_titles=tuple(file_names),
+            vertical_spacing=0.13,
+        )
+        fig.update_layout(
+            title_x=0.5,
+            dragmode=False,
+            height=100*num_group_subplots,
+            showlegend=False,
+            # legend_tracegroupgap=2400./num_group_subplots - 180.,
+        )
+        fig_features_all[f"{i}"] = fig
+    return fig_features_all
 
 def save_file(name, content, upload_directory):
     """
@@ -222,7 +258,7 @@ def get_fig_area(data, fig_area_all, shared_triggers, shared_limits):
     row_num = 1
     for name, single_obj in data.items():
         r, r_avg, r_low_lim, r_up_lim, triggers, limits = single_obj.radius_eval()
-        
+    
         # Initialize or update shared triggers
         if row_num-1 not in shared_triggers['triggers']:
             shared_triggers['triggers'][row_num-1] = {
@@ -366,6 +402,119 @@ def get_fig_avg(data, fig_mov_avg_all, shared_triggers, shared_limits):
     )
     return fig_mov_avg_all
 
+# def get_fig_features(data, fig_feature_all, window_size):
+#     """
+#     Create plot fig
+#     """
+#     row_num = 1
+#     col_num = 1
+#     for name, single_obj in data.items():
+#         r, r_avg, r_low_lim, r_up_lim, triggers, limits = single_obj.radius_eval()
+#         features_all, colors, names = sliding_window_features(r, window_size)
+    
+#         for fig_key, fig_features in fig_feature_all.items():
+#             for feat_key, y in features_all.items():
+#                 if feat_key[-1] == fig_key:
+#                     fig_features.add_trace(go.Scatter(
+#                         y=y, mode='lines', name=name,
+#                         line=dict(color=colors[feat_key]),
+#                         legendgroup=str(row_num) + str(col_num)
+#                     ), row=row_num, col=col_num)
+
+#                 fig_features.update_xaxes(
+#                     title_text="Samples", 
+#                     row=row_num, 
+#                     col=col_num,
+#                     # range=[0, len(r)] 
+#                 )
+#                 fig_features.update_yaxes(
+#                     title_text="Radius [m]", 
+#                     row=row_num, 
+#                     col=col_num,
+#                     # range=[min(r), max(r)] 
+#                 )
+#             fig_features.update_layout(
+#                 dragmode=False,
+#                 showlegend=True,
+#                 # height=300*row_num, 
+#                 autosize=True,
+#                 title_text=names[fig_key],
+#             )
+#         if col_num == 3:
+#             col_num = 1
+#             row_num += 1
+#         else:
+#             col_num += 1
+#     return fig_feature_all
+
+def get_fig_features(data, fig_feature_all, window_size):
+    row_num = 1
+    col_num = 1
+
+    for name, single_obj in data.items():
+        r, r_avg, r_low_lim, r_up_lim, triggers, limits = single_obj.radius_eval()
+        velocity = single_obj.extra_measurements()
+        features_all, colors, plot_names = sliding_window_features(r, window_size)
+    
+        x_options = {
+            "samples": np.arange(len(r)),
+            "time": np.arange(len(r)) / 100,
+            "relative_trigger": velocity
+        }
+
+        for fig_key, fig_features in fig_feature_all.items():
+            # Plot features that belong to this fig
+            for x_label, x_vals in x_options.items():
+                for feat_key, y in features_all.items():
+                    if feat_key[-1] == fig_key:
+                        fig_features.add_trace(
+                            go.Scatter(
+                                x=x_vals,
+                                y=y, 
+                                mode='lines', 
+                                name= feat_key[:-2],
+                                line=dict(color=colors[feat_key]),
+                                legendgroup=str(row_num) + str(col_num),
+                                showlegend=(row_num == 1 and col_num == 1),  # Only show once to avoid clutter
+                                visible=(x_label == "samples") # Only show samples for the first plot
+                            ),
+                            row=row_num, col=col_num
+                        )
+
+            # Only once per subplot: update layout
+            fig_features.update_xaxes(
+                title_text="Samples", row=row_num, col=col_num
+            )
+            fig_features.update_yaxes(
+                title_text="Radius [m]", row=row_num, col=col_num
+            )
+
+        # Advance subplot position
+        if col_num == 3:
+            col_num = 1
+            row_num += 1
+        else:
+            col_num += 1
+    # Update layout for all figures
+
+    for fig_key, fig_features in fig_feature_all.items():
+        fig_features.update_layout(
+        dragmode=False,
+        showlegend=True,
+        autosize=True,
+        title_text=plot_names.get(fig_key, f"Features {fig_key}"),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.2,
+            xanchor="center",
+            x=0.5,
+            title=None
+        ),
+        annotations=[]  # remove subplot titles
+        )
+    return fig_feature_all
+
 def update_subplot(df_list, triggers, limits):
     """
     Update subplot with trigger lines and limits
@@ -379,6 +528,16 @@ def update_subplot(df_list, triggers, limits):
         idx += 1
     return all_data
 
+def update_figures(data, shared_triggers, shared_limits):
+    new_data = update_subplot(data, shared_triggers, shared_limits)
+    num_group_subplots = len(new_data)
+    file_names = ["Test run " + name[:-4] for name, _ in new_data.items()]
+    # Update figures with new data
+    fig_area_all, fig_mov_avg_all = create_graph_config(num_group_subplots, file_names)
+    area_fig = get_fig_area(new_data, fig_area_all, shared_triggers, shared_limits)
+    avg_fig = get_fig_avg(new_data, fig_mov_avg_all, shared_triggers, shared_limits)
+    return area_fig, avg_fig
+
 def SK_radius_eval(eval_data, triggers, limits):
     modul_R_param = evlSK.modul_R(eval_data['Radius'], limits)
     R = modul_R_param.compute_module_R()
@@ -388,5 +547,65 @@ def SK_radius_eval(eval_data, triggers, limits):
     t = modul_t_param.compute_module_t()
     evaluation = 0.5 * R + 0.3 * dH + 0.2 * t
 
-    plot_res = evlSK.plotting(modul_R_param, module_dH_param, 1, triggers, limits)
+    plot_res = evlSK.plotting(modul_R_param, module_dH_param, 1, 
+                              triggers, limits, eval_data['Fahrge_DIS'])
     return plot_res
+
+def sliding_window_features(raw, window_size=50):
+    n = len(raw)
+    max_q = deque()
+    min_q = deque()
+    
+    features = {
+        'Maximum_1': [],
+        'Minimum_1': [],
+        'Standard deviation_2': [],
+        'range': [],
+        'rms': [],
+        'skewness': [],
+        'kurtosis': []
+    }
+
+    colors = {
+        'Maximum_1': 'blue',
+        'Minimum_1': 'red',
+        'Standard deviation_2': 'green',
+        'Range': 'orange',
+        'rms': 'purple',
+        'Skewness': 'brown',
+        'Kurtosis': 'pink'
+    }
+
+    names = {
+        '1': 'Maximum and Minimum',
+        '2': 'Standard Deviation',
+    }
+
+    for i in range(n):
+        # Deque updates for max
+        while max_q and max_q[0] <= i - window_size:
+            max_q.popleft()
+        while max_q and raw[max_q[-1]] <= raw[i]:
+            max_q.pop()
+        max_q.append(i)
+
+        # Deque updates for min
+        while min_q and min_q[0] <= i - window_size:
+            min_q.popleft()
+        while min_q and raw[min_q[-1]] >= raw[i]:
+            min_q.pop()
+        min_q.append(i)
+
+        # Once we have a full window
+        if i >= window_size - 1:
+            window = raw[i - window_size + 1:i + 1]
+            features['Maximum_1'].append(raw[max_q[0]])
+            features['Minimum_1'].append(raw[min_q[0]])
+            # features['mean'].append(np.mean(window))
+            features['Standard deviation_2'].append(np.std(window))
+            # features['range'].append(raw[max_q[0]] - raw[min_q[0]])
+            # features['rms'].append(np.sqrt(np.mean(window ** 2)))
+            # features['skewness'].append(skew(window))
+            # features['kurtosis'].append(kurtosis(window))
+
+    return features, colors, names

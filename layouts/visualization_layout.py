@@ -1,21 +1,6 @@
 import dash_bootstrap_components as dbc
 from dash import dash_table, dcc, html
-
-def create_graph_config():
-    return {
-        'displayModeBar': True,
-        'scrollZoom': False,
-        'editable': True,
-        'edits': {
-            'shapePosition': True,  # Enable shape dragging
-        },
-    }
-
-def create_graph_layout():
-    return {
-        'dragmode': 'draggable',
-        'hovermode': 'closest'
-    }
+import utils.utils as utils
 
 visualization_layout = html.Div(
         className='nine columns div-for-charts bg-white',
@@ -115,10 +100,10 @@ visualization_layout = html.Div(
                   dcc.Tab(label='Area calculation', value='tab-area',
                       children=[
                           dcc.Graph(id='area_under_radius',
-                                    config=create_graph_config(),
+                                    config=utils.create_graph_config(),
                                     animate=False,
-                                    figure={'layout': create_graph_layout()},
-                                    # style={'height': '2400px'}
+                                    figure={'layout': utils.create_graph_layout()},
+                                    style={'height': '2400px'}
                                     ),
                       ],
                       className='custom-tab',
@@ -127,19 +112,32 @@ visualization_layout = html.Div(
                   dcc.Tab(label='Moving Average for Radius', value='tab-avg-radius',
                       children=[
                           dcc.Graph(id='mov_avg_radius',
-                                    config=create_graph_config(),
+                                    config=utils.create_graph_config(),
                                     animate=False,
-                                    figure={'layout': create_graph_layout()},
-                                    # style={'height': '2400px'}
+                                    figure={'layout': utils.create_graph_layout()},
+                                    style={'height': '2400px'}
                                     ),
                       ],
                       className='custom-tab',
                       selected_className='custom-tab--selected',
                   ),
-                  dcc.Tab(label='Extra Tab',
-                      children=[],
-                      className='custom-tab',
-                      selected_className='custom-tab--selected',
+                  dcc.Tab(label='Feature Extraction', value='tab-feature-extraction',
+                      children=[
+                         html.Div(id='feature-tab-content') 
+                        #   html.Div(
+                            #   children=[
+                            #       dcc.Graph(id='features_extraction_{key}',
+                            #             figure=fig,
+                            #             config=create_graph_config(),
+                            #             animate=False,
+                            #             # style={'height': '2400px'}
+                            #             )
+                            #             for key, fig in features_plots.items()
+                            #         ]
+                            #     )
+                            ],
+                        className='custom-tab',
+                        selected_className='custom-tab--selected',
                   ),
               ],
               style={'color': '#ffffff'}
@@ -152,15 +150,20 @@ visualization_layout = html.Div(
                         dbc.Row([
                             dbc.Label("Select Subplot:"),
                             dcc.Dropdown(
-                                id='subplot-selector',
+                                id='subplot-selector-function', 
                                 placeholder="Select subplot to edit",
-                                className="mb-3"
+                                className="mb-3",
+                                options = [],
+                                value = "",
+                                searchable=True,
+                                clearable=True,
+                                multi=False
                             ),
                         ]),
                         dbc.Row([
                             dbc.Label("Select Line:"),
                             dcc.Dropdown(
-                                id='line-selector',
+                                id='horizontal-line-selector',
                                 options=[
                                     {'label': 'Target Line', 'value': 'target'},
                                     {'label': 'Warning High', 'value': 'warning_high'},
@@ -184,9 +187,54 @@ visualization_layout = html.Div(
                     ]),
                 ]),
                 dbc.ModalFooter([
-                    dbc.Button("Apply", id="apply-function", color="primary"),
-                    dbc.Button("Close", id="close-modal", className="ml-2"),
+                    dbc.Button("Apply", id="apply-changes-function-modal", color="primary"),
+                    dbc.Button("Close", id="close-function-modal", className="ml-2"),
                 ]),
             ], id="function-modal"),
+
+            # Add modal for triggers editing
+            dbc.Modal([
+                dbc.ModalHeader("Edit Triggers"),
+                dbc.ModalBody([
+                    dbc.Form([
+                        dbc.Row([
+                            dbc.Label("Select Subplot:"),
+                            dcc.Dropdown(
+                                id='subplot-selector-triggers',
+                                placeholder="Select subplot to edit",
+                                className="mb-3",
+                                options = [],
+                                value = "",
+                                searchable=True,
+                                clearable=True,
+                                multi=False
+                            ),
+                            dbc.Button("Select", id="select-subplot-triggers", color="primary"),
+                        ]),
+                        dbc.Row([
+                            dbc.Label("Star Trigger Value:"),
+                            dbc.Input(
+                                id="start-trigger-value-input",
+                                placeholder="Enter a value",
+                                type="number",
+                                value = "",
+                                className="mb-3"
+                            ),
+                            dbc.Label("Stop Trigger Value:"),
+                            dbc.Input(
+                                id="stop-trigger-value-input",
+                                placeholder="Enter a value",
+                                type="number",
+                                value = "",
+                                className="mb-3"
+                            ),
+                        ]),
+                    ]),
+                ]),
+                dbc.ModalFooter([
+                    dbc.Button("Apply", id="apply-changes-triggers-modal", color="primary"),
+                    dbc.Button("Close", id="close-triggers-modal", className="ml-2"),
+                ]),
+            ], id="triggers-modal")
         ]
 )

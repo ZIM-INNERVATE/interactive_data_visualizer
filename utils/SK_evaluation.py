@@ -162,62 +162,22 @@ class modul_t:
 
 # visualisation of some intermediate results
 class plotting:
-    def __init__(self, modul_R, modul_dH, axs_dH, triggers, limits):
+    def __init__(self, modul_R, modul_dH, axs_dH, triggers, limits, velocity):
         self.modul_R_param = modul_R
         self.modul_dH_param = modul_dH
         self.axs = axs_dH
         self.triggers = triggers
         self.limits = limits
-
-    # def plot_mov_aver_R(self):
-    #     fig, axs = plt.subplots(2)
-    #     fig.suptitle('Channel: Radius evaluation')
-
-    #     # Create masks for regions where y is above or below the limits
-    #     lower_extreme = self.modul_R_param.R_low_limit
-    #     lower_limit = 39
-    #     upper_limit = 41
-    #     upper_extreme = self.modul_R_param.R_upper_limit
-
-    #     # Create masks for regions
-    #     y = self.modul_R_param.avg_radius
-    #     x = range(0, len(self.modul_R_param.avg_radius))
-
-    #     y_below_inner = np.where((y > lower_extreme) & (y < lower_limit), y, lower_limit)
-    #     y_above_inner = np.where((y < upper_extreme) & (y > upper_limit), y, upper_limit)
-
-    #     axs[0].plot(self.modul_R_param.radius, color='blue', label='Radius')
-    
-    #     for ax in axs.flat:
-    #         ax.axhline(y=self.modul_R_param.R_low_limit, color='r', linestyle='--', label='Alarm')
-    #         ax.axhline(y=self.modul_R_param.R_upper_limit, color='r', linestyle='--')
-    #         ax.axhline(y=39, color='g', linestyle='--')
-    #         ax.axhline(y=40, color='black', linestyle='--', label='Target')
-    #         ax.axhline(y=41, color='g', linestyle='--', label='Warning')
-    #         ax.plot(self.modul_R_param.avg_radius, color='lightblue', label='Moving average')
-    #         # ax.axvline(x = self.triggers['Start Trigger'], color = 'g', linestyle='-.', label = 'Start trigger')
-    #         # ax.axvline(x = self.triggers['Stop Trigger'], color = 'r', linestyle='-.', label = 'Stop trigger')
-
-    #     # axs[0].plot(self.modul_R_param.avg_radius_, color='azure', label='Moving average 2')
-    #     # axs[0].plot(self.modul_R_param.avg_radius_conv, color='yellow', label='Moving average conv')
-        
-    #     axs[1].fill_between(x, y, lower_extreme, where=(y < lower_extreme), color='red', alpha=0.5, label='Outside of limits')
-    #     axs[1].fill_between(x, y, upper_extreme, where=(y > upper_extreme), color='red', alpha=0.5)
-    #     axs[1].fill_between(x, lower_limit, y_below_inner, where=y_below_inner, color='orange', alpha=0.4, label='Inside radius range')
-    #     axs[1].fill_between(x, upper_limit, y_above_inner, where=y_above_inner, color='orange', alpha=0.4)
-    #     axs[1].fill_between(x, self.modul_R_param.avg_radius, 40, color='coral', alpha=0.2,  label='Optimal radius')
-        
-    #     for ax in axs.flat:
-    #         ax.set(xlabel='Time [s]', ylabel='Radius [m]')
-    #         ax.grid(True)
-    #         ax.legend()
-    #     plt.show()
+        self.Fahrge_DIS = velocity
 
     def radius_eval(self):
         return self.modul_R_param.radius, self.modul_R_param.avg_radius, \
         self.modul_R_param.R_low_limit, self.modul_R_param.R_upper_limit, \
         self.triggers, self.limits
-
+    
+    def extra_measurements(self):
+        return self.Fahrge_DIS #velocity in km/h
+    
     def plot_curve_dH(self, clr_scatter, marker_scatter, clr_plot):
         #fig, axs = plt.subplots(2)
         data_time = self.modul_dH_param.meas_time

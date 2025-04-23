@@ -63,10 +63,19 @@ option_layout = html.Div(
                       "Edit Line Functions",
                       id="open-function-modal",
                       color="primary",
-                      className="mb-3",
-                      style={'padding': '10px 10px 10px 10px'}
+                      className="mb-1",
+                      style={'padding': '10px 10px 10px 10px'},
                       ),
-                    ]),
+
+                      dbc.Button(
+                      "Edit Triggers",
+                      id="open-triggers-modal",
+                      color="primary",
+                      className="mb-1",
+                      style={'padding': '10px 10px 10px 10px'},
+                      ),
+                    ],
+                    className="mb-3 gap-2 d-md-flex justify-content-md-center"),
                   ],
                 ),
             ],
